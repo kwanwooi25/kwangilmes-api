@@ -10,9 +10,9 @@ module.exports = (app, db) => {
   =========================================*/
 
   // Create table if table does not exist
-  db.schema.hasTable('products').then(function(exists) {
+  db.schema.hasTable('products').then(exists => {
     if (!exists) {
-      db.schema.createTable('products', function(table) {
+      db.schema.createTable('products', table => {
         table.increments('id').primary();
         table.string('account_id').notNullable();
         table.string('name').notNullable();
@@ -47,7 +47,7 @@ module.exports = (app, db) => {
         table.float('unit_price');
         table.json('order_history');
         table.text('memo');
-      });
+      }).then(console.log);
     }
   });
 
@@ -94,8 +94,19 @@ module.exports = (app, db) => {
     const data = req.body; // array of account object
 
     // check if product name is empty
-    const isNameEmpty = data.map(product => !!product.name).includes(false);
-    if (isNameEmpty) return res.status(400).json('품목명을 입력해야 합니다.');
+    const isRequiredEmpty = data
+      .map(
+        product =>
+          !!product.name ||
+          !!product.account_id ||
+          !!product.thick ||
+          !!product.lentgh ||
+          !!product.width ||
+          !!product.ext_color
+      )
+      .includes(false);
+    if (isRequiredEmpty)
+      return res.status(400).json('필수항목을 입력해야 합니다.');
 
     // check if account id of product exists
     Promise.all(
@@ -125,36 +136,44 @@ module.exports = (app, db) => {
     const { id } = req.params;
     const data = req.body; // object containing account info
 
-    if (!data.name) {
-      res.status(400).json('품목명을 입력해야 합니다.');
-    } else if (!data.account_id) {
-      res.status(400).json('업체명을 입력해야 합니다.');
-    } else if (!data.thick) {
-      res.status(400).json('두께를 입력해야 합니다.');
-    } else if (!data.length) {
-      res.status(400).json('길이를 입력해야 합니다.');
-    } else if (!data.width) {
-      res.status(400).json('너비를 입력해야 합니다.');
-    } else if (!data.ext_color) {
-      res.status(400).json('원단색상을 입력해야 합니다.');
-    } else {
-      db('accounts')
-        .select('name')
-        .where('id', '=', data.account_id)
-        .then(response => !!response.length)
-        .then(isAccountExist => {
-          if (isAccountExist) {
-            db('products')
-              .where('id', '=', id)
-              .update(data)
-              .returning('*')
-              .then(product => res.json(product))
-              .catch(error => res.status(400).json('error updating product'));
-          } else {
-            res.status(400).json('존재하지 않는 업체명입니다.');
-          }
-        });
-    }
+    const REQUIRED_PROPS = [
+      'name',
+      'account_id',
+      'thick',
+      'length',
+      'width',
+      'ext_color'
+    ];
+
+    // remove property of incoming data if value is empty
+    REQUIRED_PROPS.forEach(prop => {
+      if (data[prop] === '') delete data[prop];
+    });
+
+    if (!Object.keys(data).length) return res.status(400).json('수정할 항목이 없습니다.');
+
+    db('products')
+      .select('*')
+      .where('id', '=', id)
+      .then(response => {
+        db('accounts')
+          .select('name')
+          .where('id', '=', response[0].account_id)
+          .then(response => !!response.length)
+          .then(isAccountExist => {
+            if (isAccountExist) {
+              db('products')
+                .where('id', '=', id)
+                .update(data)
+                .returning('*')
+                .then(product => res.json(product))
+                .catch(error => res.status(400).json(error));
+            } else {
+              res.status(400).json('존재하지 않는 업체명입니다.');
+            }
+          });
+      })
+      .catch(error => res.status(400).json('품목이 존재하지 않습니다.'));
   });
 
   // 품목 삭제
