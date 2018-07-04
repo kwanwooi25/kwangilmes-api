@@ -9,10 +9,10 @@ module.exports = (app, db) => {
   DELETE  /accounts      거래처 삭제
   =========================================*/
 
-  // Create table if table
-  db.schema.hasTable('accounts').then(exists => {
+  // Create table if table does not exist
+  db.schema.hasTable('accounts').then(function(exists) {
     if (!exists) {
-      db.schema.createTable('accounts', table => {
+      db.schema.createTable('accounts', function(table) {
         table.increments('id');
         table.string('name');
         table.string('phone');
@@ -36,18 +36,22 @@ module.exports = (app, db) => {
   app.post('/accounts', (req, res) => {
     const { limit, offset, searchTerm } = req.body;
 
-    db.select('*')
-      .from('accounts')
-      .where('name', 'like', `%${searchTerm}%`)
-      .limit(limit)
-      .offset(offset)
-      .then(data => {
-        if (data.length) {
-          res.json(data);
-        } else {
-          res.status(400).json('표시할 결과가 없습니다.');
-        }
-      });
+    if (limit !== undefined && offset !== undefined) {
+      db.select('*')
+        .from('accounts')
+        .where('name', 'like', `%${searchTerm}%`)
+        .limit(limit)
+        .offset(offset)
+        .then(data => {
+          if (data.length) {
+            res.json(data);
+          } else {
+            res.status(400).json('표시할 결과가 없습니다.');
+          }
+        });
+    } else {
+      res.status(400).json('데이터를 가져올 수 없습니다.');
+    }
   });
 
   // 단일 거래처 조회
@@ -70,10 +74,7 @@ module.exports = (app, db) => {
   app.post('/accounts/add', (req, res) => {
     const data = req.body; // array of account object
 
-    const isNameEmpty = data
-      .map(account => !!account.name)
-      .filter(result => result === false)
-      .includes(false);
+    const isNameEmpty = data.map(account => !!account.name).includes(false);
 
     if (isNameEmpty) {
       res.status(400).json('업체명을 입력해야 합니다.');
@@ -81,7 +82,8 @@ module.exports = (app, db) => {
       db.insert(data)
         .into('accounts')
         .returning('*')
-        .then(accounts => res.json(accounts));
+        .then(accounts => res.json(accounts))
+        .catch(error => res.status(400).json('error adding accounts'));
     }
   });
 
@@ -97,7 +99,8 @@ module.exports = (app, db) => {
         .where('id', '=', id)
         .update(data)
         .returning('*')
-        .then(account => res.json(account));
+        .then(account => res.json(account))
+        .catch(error => res.status(400).json('error updating account'));
     }
   });
 
@@ -109,12 +112,10 @@ module.exports = (app, db) => {
       db('accounts')
         .whereIn('id', ids)
         .del()
-        .then(response => {
-          res.json(`${response} 개 업체가 정상적으로 삭제되었습니다.`);
-        })
-        .catch(error => {
-          res.status(400).json('error deleting accounts');
-        });
+        .then(response =>
+          res.json(`${response} 개 업체가 정상적으로 삭제되었습니다.`)
+        )
+        .catch(error => res.status(400).json('error deleting accounts'));
     } else {
       res.status(400).json('삭제할 업체 정보가 없습니다.');
     }
