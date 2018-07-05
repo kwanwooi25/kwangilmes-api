@@ -23,6 +23,7 @@ app.get('/', (req, res) => {
 // ROUTES
 require('./routes/accounts')(app, db);
 require('./routes/products')(app, db);
+require('./routes/plates')(app, db);
 
 
 app.listen(3000, () => {
