@@ -57,7 +57,7 @@ module.exports = (app, db) => {
           table.boolean('pack_deliver_all').defaultTo(false);
           table.text('pack_memo');
           table.float('unit_price');
-          table.json('order_history');
+          table.text('old_history');
           table.date('product_created_at');
           table.date('product_last_modified_at');
           table.text('product_memo');
@@ -75,8 +75,9 @@ module.exports = (app, db) => {
 
   // 전체 품목 조회
   app.post('/products', (req, res) => {
-    const { limit = 10, offset = 0 } = req.body;
     const {
+      limit = 10,
+      offset = 0,
       account_name = '',
       product_name = '',
       product_thick = '',
@@ -84,7 +85,7 @@ module.exports = (app, db) => {
       product_width = '',
       ext_color = '',
       print_color = ''
-    } = req.body.search;
+    } = req.body;
 
     db.select('*')
       .from('accounts')

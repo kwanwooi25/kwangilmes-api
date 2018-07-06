@@ -39,11 +39,14 @@ module.exports = (app, db) => {
                 .primary()
                 .unique();
               table.timestamp('ordered_at').notNullable();
+              table.timestamp('order_modified_at');
+              table.boolean('is_order_modified').defaultTo(false);
               table.integer('account_id').notNullable();
               table.integer('product_id').notNullable();
               table.integer('order_quantity').notNullable();
               table.float('order_quantity_weight').notNullable();
               table.string('plate_status'); // 신규, 수정, 확인
+              table.boolean('is_plate_ready').defaultTo(true);
               table.string('order_status').defaultTo('압출중'); // 압출중, 인쇄중, 가공중, 완료
               table.timestamp('deliver_by').notNullable();
               table.boolean('is_delivery_strict').defaultTo(false);
@@ -139,15 +142,16 @@ module.exports = (app, db) => {
     if (isRequiredEmpty)
       return res.status(400).json('필수항목을 입력해야 합니다.');
 
-    // check if product id exists
+    // 품목 정보 확인
     db('products')
       .where('id', '=', data.product_id)
       .then(products => {
         if (products.length === 0) {
-          res.status(400).json('존재하지 않는 품목입니다.');
+          return res.status(400).json('존재하지 않는 품목입니다.');
         } else {
+          console.log('품목정보 확인 완료::: ', products[0]);
           const product = products[0];
-          // 주문수량 => 중량 계산
+          // 주문 중량 계산
           const calculateWeight = () => {
             return (
               Number(product.product_thick) *
@@ -157,24 +161,58 @@ module.exports = (app, db) => {
               Number(data.order_quantity)
             );
           };
+          // 납기일자 계산
+          const getDeliverBy = () => {
+            let leadtime = 7;
+            if (product.is_print) leadtime = 10;
+            return moment(data.ordered_at)
+              .add(leadtime, 'days')
+              .format('YYYY-MM-DD');
+          };
 
+          // 주문일, 납기일, 업체ID, 주문중량
           data.ordered_at = data.ordered_at || moment().format('YYYY-MM-DD');
-          data.deliver_by = data.deliver_by || moment().add(10, 'days').format('YYYY-MM-DD');
-          data.account_id = product.account_id;
+          data.deliver_by = data.deliver_by || getDeliverBy();
+          data.account_id = data.account_id || product.account_id;
           data.order_quantity_weight = calculateWeight();
 
-          db('orders_id_seq')
-            .where('id', '=', moment(data.ordered_at).format('YYYY-MM'))
-            // 주문번호 생성
+          // 인쇄품목 동판상태 비어있을 경우 = '확인' (default)
+          if (product.is_print && !data.plate_status) {
+            data.plate_status = '확인';
+          }
+
+          // 동판준비상태
+          // 인쇄일때  && 동판상태 === 확인 = true
+          // 무지일때 = true
+          data.is_plate_ready =
+            product.is_print && data.plate_status === '확인';
+          if (product.is_print === false) data.is_plate_ready = true;
+
+          return data;
+        }
+      })
+      .then(orderData => {
+        /*--------------------------------------------
+        1. 주문번호 생성
+        2. 주문 등록
+        --------------------------------------------*/
+        db.transaction(trx => {
+          // 1. 주문번호 생성
+          trx('orders_id_seq')
+            .where('id', '=', moment(orderData.ordered_at).format('YYYY-MM'))
             .then(orderSeq => {
               if (orderSeq.length) {
-                const sequence = ('00' + orderSeq[0].seq).slice(-3);
-                return `${orderSeq[0].id}-${sequence}`;
-                db('orders_id_seq')
+                return trx('orders_id_seq')
                   .where('id', '=', orderSeq[0].id)
-                  .increment('seq', 1);
+                  .increment('seq', 1)
+                  .returning('*')
+                  .then(updatedOrderSeq => {
+                    const sequence = ('00' + updatedOrderSeq[0].seq).slice(-3);
+                    return `${updatedOrderSeq[0].id}-${sequence}`;
+                  });
               } else {
-                db.insert({ id: moment(data.ordered_at).format('YYYY-MM') })
+                return trx
+                  .insert({ id: moment(data.ordered_at).format('YYYY-MM') })
                   .into('orders_id_seq')
                   .returning('*')
                   .then(newOrderSeq => {
@@ -183,27 +221,37 @@ module.exports = (app, db) => {
                   });
               }
             })
-            .then(orderId => data.id = orderId);
-        }
-        return data;
+            .then(orderId => {
+              console.log('주문번호 생성 완료::: ', orderId);
+              data.id = orderId;
+              return data;
+            })
+            .then(orderToAdd => {
+              console.log('주문등록 정보 가공완료::: ', orderToAdd);
+              // 2. 주문 등록
+              return trx
+                .insert(orderToAdd)
+                .into('orders')
+                .returning('*')
+                .then(orders => {
+                  console.log('주문등록 완료::: ', orders[0]);
+                  return res.json(orders[0]);
+                })
+                .then(trx.commit)
+                .catch(trx.rollback);
+            });
+        });
       })
-      .then(orderToAdd => {
-        console.log(orderToAdd);
-      });
-
-    return true;
-
-          // db.insert(data)
-          //   .into('orders')
-          //   .returning('*')
-          //   .then(orders => res.json(orders))
-          //   .catch(error => res.status(400).json(error));
+      .catch(error => res.status(400).json('error placing an order'));
   });
+
+  /* TODO */
 
   // 주문 정보 수정
   app.put('/orders/:id', (req, res) => {
     const { id } = req.params;
     const data = req.body; // object containing product info
+    console.log(data);
 
     // remove property of incoming data if value is empty
     REQUIRED_PROPS.forEach(prop => {
@@ -217,26 +265,62 @@ module.exports = (app, db) => {
       .select('*')
       .where('id', '=', id)
       .then(response => {
-        db('accounts')
-          .select('account_name')
-          .where('id', '=', response[0].account_id)
-          .then(response => !!response.length)
-          .then(isAccountExist => {
-            if (isAccountExist) {
-              // 수정일자 입력
-              data.product_last_modified_at = new Date();
-              db('orders')
-                .where('id', '=', id)
-                .update(data)
-                .returning('*')
-                .then(product => res.json(product))
-                .catch(error => res.status(400).json(error));
-            } else {
-              res.status(400).json('존재하지 않는 업체명입니다.');
-            }
+        console.log('주문정보 가져오기 완료::: ', response[0]);
+        const { product_id } = response[0];
+
+        // 수정내용 중 동판상태 or 주문수량이 있을 경우
+        if (data.plate_status || data.order_quantity) {
+          return db('products')
+            .select('product_thick', 'product_length', 'product_width', 'is_print')
+            .where('id', '=', product_id)
+            .then(productInfo => {
+              const {
+                product_thick,
+                product_length,
+                product_width,
+                is_print
+              } = productInfo[0];
+
+              // 동판준비상태 작성
+              if (data.plate_status) {
+                data.is_plate_ready =
+                  is_print && data.plate_status === '확인';
+                if (is_print === false) data.is_plate_ready = true;
+              }
+
+              // 중량계산
+              if (data.order_quantity) {
+                data.order_quantity_weight =
+                  Number(product_thick) *
+                  (Number(product_length) + 5) *
+                  (Number(product_width) / 100) *
+                  0.0184 *
+                  Number(data.order_quantity);
+              }
+
+              return data;
+            });
+        } else {
+          return data;
+        }
+      })
+      .then(orderToUpdate => {
+        console.log('수정 주문정보 작성 완료::: ', orderToUpdate);
+        orderToUpdate.is_order_modified = true;
+        orderToUpdate.order_modified_at = moment().format('YYYY-MM-DD');
+        /*--------------------------------------------
+         주문정보 수정
+        --------------------------------------------*/
+        db('orders')
+          .where('id', '=', id)
+          .update(orderToUpdate)
+          .returning('*')
+          .then(orders => {
+            console.log('주문정보 수정 완료::: ', orders[0]);
+            return res.json(orders[0]);
           });
       })
-      .catch(error => res.status(400).json('주문이 존재하지 않습니다.'));
+      .catch(error => res.status(400).json('error updating an order'));
   });
 
   // 주문 삭제
