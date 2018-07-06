@@ -24,6 +24,7 @@ app.get('/', (req, res) => {
 require('./routes/accounts')(app, db);
 require('./routes/products')(app, db);
 require('./routes/plates')(app, db);
+require('./routes/orders')(app, db);
 
 
 app.listen(3000, () => {
