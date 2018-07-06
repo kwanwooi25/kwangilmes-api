@@ -1,30 +1,32 @@
 const bodyParser = require('body-parser');
-const knex = require('knex');
-
-const db = knex({
-  client: 'pg',
-  connection: {
-    host: 'kwanwoodb.ccbl9zbqcka3.ap-northeast-2.rds.amazonaws.com',
-    user: 'kwanwooi',
-    password: 'rhksnsla12',
-    database: 'kwangilmes_test'
-  }
-});
+const session = require('express-session');
+const cookieSession = require('cookie-session');
+const passport = require('passport');
 
 const app = require('express')();
+const db = require('./database');
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
+// PASSPORT
+app.use(cookieSession({
+  maxAge: 12 * 60 * 60 * 1000, // expires in 12 hours
+  keys: ['123809u18hsadfghukjgrui2rghasjkasdf23']
+}));
+app.use(passport.initialize());
+app.use(passport.session());
+require('./services/passport');
+
+// ROUTES
 app.get('/', (req, res) => {
   res.send("Yes! I'm listening");
 });
-
-// ROUTES
-require('./routes/accounts')(app, db);
-require('./routes/products')(app, db);
-require('./routes/plates')(app, db);
-require('./routes/orders')(app, db);
+require('./routes/users')(app);
+require('./routes/accounts')(app);
+require('./routes/products')(app);
+require('./routes/plates')(app);
+require('./routes/orders')(app);
 
 
 app.listen(3000, () => {
