@@ -59,16 +59,19 @@ const PERMISSIONS = [
 ];
 
 module.exports = app => {
-  /*=======================================
+  /*==============================================
   ROUTES
-  -----------------------------------------
-  GET     /users               전체 사용자 정보
-  GET     /users/current_user  현재 사용자 정보
-  POST    /users/add           사용자 등록
-  POST    /users/remove        사용자 삭제
-  POST    /users/signin        사용자 로그인
-  GET     /users/logout        사용자 로그아웃
-  =========================================*/
+  ------------------------------------------------
+  GET     /users                     전체 사용자 정보
+  GET     /current_user              현재 사용자 정보
+  GET     /users/:username           선택 사용자 정보
+  PUT     /users/:username           사용자 정보 수정
+  PUT     /users/password/:username  사용자 비밀번호 수정
+  DELETE  /users/:username           사용자 삭제
+  POST    /register                  사용자 등록
+  POST    /login                     사용자 로그인
+  GET     /logout                    사용자 로그아웃
+  ================================================*/
 
   // Create table if table does not exist
   db.schema.hasTable('users').then(exists => {
@@ -187,63 +190,136 @@ module.exports = app => {
   /*-----------------------------
     현재 사용자 정보 가져오기
   -----------------------------*/
-  app.get('/users/current_user', (req, res) => {
+  app.get('/current_user', (req, res) => {
     res.json(req.user);
+  });
+
+  /*-----------------------------
+    선택 사용자 정보 가져오기
+  -----------------------------*/
+  app.get('/users/:username', requireLogin, canReadUsers, (req, res) => {
+    const { username } = req.params;
+    db.select('*')
+      .from('users')
+      .where('username', '=', username)
+      .then(user => res.json(user[0]))
+      .catch(error => res.status(400).json('error fetching the user'));
   });
 
   /*-----------------------------
     새로운 사용자 등록
   -----------------------------*/
-  app.post(
-    '/users/add',
-    requireLogin,
-    canWriteUsers,
-    (req, res) => {
-      const user = req.body;
-      const hash = bcrypt.hashSync(user.password);
-      delete user.password;
+  app.post('/register', requireLogin, canWriteUsers, (req, res) => {
+    const user = req.body;
+    const hash = bcrypt.hashSync(user.password);
+    delete user.password;
 
-      db.select('username')
-        .from('users')
-        .where('username', '=', user.username)
-        .then(users => {
-          if (users.length) {
-            res.status(400).json('이미 존재하는 아이디입니다.');
-            return false;
-          }
-          return true;
-        })
-        .then(isUsernameValid => {
-          if (isUsernameValid) {
-            db.transaction(trx => {
-              trx
-                .insert(user)
-                .into('users')
-                .returning('*')
-                .then(user => {
-                  return trx
-                    .insert({
-                      username: user[0].username,
-                      password: hash
-                    })
-                    .into('login')
-                    .returning('*')
-                    .then(() => res.json(user[0]));
-                })
-                .then(trx.commit)
-                .catch(trx.rollback);
-            });
-          }
-        })
-        .catch(error => res.status(400).json('error registering a user'));
+    db.select('username')
+      .from('users')
+      .where('username', '=', user.username)
+      .then(users => {
+        if (users.length) {
+          res.status(400).json('이미 존재하는 아이디입니다.');
+          return false;
+        }
+        return true;
+      })
+      .then(isUsernameValid => {
+        if (isUsernameValid) {
+          db.transaction(trx => {
+            trx
+              .insert(user)
+              .into('users')
+              .returning('*')
+              .then(user => {
+                return trx
+                  .insert({
+                    username: user[0].username,
+                    password: hash
+                  })
+                  .into('login')
+                  .returning('*')
+                  .then(() => res.json(user[0]));
+              })
+              .then(trx.commit)
+              .catch(trx.rollback);
+          });
+        }
+      })
+      .catch(error => res.status(400).json('error registering a user'));
+  });
+
+  /*-----------------------------
+    사용자 정보 수정
+  -----------------------------*/
+  app.put('/users/:username', requireLogin, canReadUsers, (req, res) => {
+    const { username } = req.params;
+    const data = req.body;
+    if (data.display_name === '') delete data.display_name;
+
+    db('users')
+      .where('username', '=', username)
+      .update(data)
+      .returning('*')
+      .then(user => res.json(user[0]))
+      .catch(error => res.status(400).json('error updating a user'));
+  });
+
+  /*-----------------------------
+    사용자 비밀번호 수정
+  -----------------------------*/
+  app.put(
+    '/users/password/:username',
+    requireLogin,
+    canReadUsers,
+    (req, res) => {
+      const { username } = req.params;
+      const data = req.body;
+      const loginData = {};
+      if (data.password === '') {
+        return res.status(400).json('password is empty');
+      } else {
+        loginData.password = bcrypt.hashSync(data.password);
+      }
+
+      db('login')
+        .where('username', '=', username)
+        .update(loginData)
+        .returning('*')
+        .then(result => res.json('비밀번호 변경 완료'))
+        .catch(error => res.status(400).json('error updating password'));
     }
   );
+
+  /*-----------------------------
+    사용자 삭제
+  -----------------------------*/
+  app.delete('/users/:username', requireLogin, canReadUsers, (req, res) => {
+    const { username } = req.params;
+    if (username === 'admin')
+      return res.status(400).json('admin 계정은 삭제할 수 없습니다.');
+
+    db.transaction(trx => {
+      trx('users')
+        .where('username', '=', username)
+        .del()
+        .then(() => {
+          return trx('login')
+            .where('username', '=', username)
+            .del()
+            .then(result => res.json(`사용자 (${username}) 삭제 완료`))
+            .catch(error => res.status(400).json('unable to find user'));
+        })
+        .then(trx.commit)
+        .catch(trx.rollback);
+    }).catch(error => res.status(400).json('error removing user'));
+  });
 
   /*-----------------------------
     로그인
   -----------------------------*/
   app.post(
-    '/users/signin',
+    '/login',
     passport.authenticate('local', { failureRedirect: '/' }),
     (req, res) => {
       res.json(req.user);
@@ -253,7 +329,7 @@ module.exports = app => {
   /*-----------------------------
     로그아웃
   -----------------------------*/
-  app.get('/users/logout', (req, res) => {
+  app.get('/logout', (req, res) => {
     if (req.user) {
       req.logout();
       res.json('로그아웃 되었습니다.');
