@@ -2,10 +2,12 @@ const bodyParser = require('body-parser');
 const session = require('express-session');
 const cookieSession = require('cookie-session');
 const passport = require('passport');
+const cors = require('cors');
 
 const app = require('express')();
 const db = require('./database');
 
+app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
