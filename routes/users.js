@@ -320,7 +320,7 @@ module.exports = app => {
   -----------------------------*/
   app.post(
     '/login',
-    passport.authenticate('local'),
+    passport.authenticate('local', { session: true }),
     (req, res) => {
       res.json(req.user);
     }
