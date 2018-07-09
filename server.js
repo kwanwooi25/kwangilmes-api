@@ -9,7 +9,6 @@ const app = require('express')();
 const db = require('./database');
 
 app.use(cors());
-app.use(cookieParser('ehdgoanfrhk1qorentksdl2akfmrhekfgehfhr3'));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
