@@ -14,7 +14,7 @@ app.use(bodyParser.json());
 // PASSPORT
 app.use(cookieSession({
   maxAge: 12 * 60 * 60 * 1000, // expires in 12 hours
-  keys: ['123809u18hsadfghukjgrui2rghasjkasdf23']
+  keys: ['ehdgoanfrhk1qorentksdl2akfmrhekfgehfhr3']
 }));
 app.use(passport.initialize());
 app.use(passport.session());
