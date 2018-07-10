@@ -64,11 +64,17 @@ module.exports = app => {
       .where('account_name', 'like', `%${searchTerm}%`)
       .limit(limit)
       .offset(offset)
-      .then(data => {
-        if (data.length) {
-          res.json(onRequestSuccess(data));
+      .then(accounts => {
+        if (accounts.length) {
+          db('accounts')
+            .count('account_name', 'like', `%${searchTerm}%`)
+            .then(result => {
+              const data = { count: result[0].count, accounts };
+              res.json(onRequestSuccess(data));
+            });
         } else {
-          res.status(400).json(onRequestFail('표시할 결과가 없습니다.'));
+          const data = { count: 0, accounts: [] }
+          res.json(onRequestSuccess(data));
         }
       })
       .catch(error =>
