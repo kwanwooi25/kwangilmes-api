@@ -69,8 +69,6 @@ module.exports = app => {
   PUT     /users/password/:username  사용자 비밀번호 수정
   DELETE  /users/:username           사용자 삭제
   POST    /register                  사용자 등록
-  POST    /login                     사용자 로그인
-  GET     /logout                    사용자 로그아웃
   ================================================*/
 
   // Create table if table does not exist
@@ -313,28 +311,5 @@ module.exports = app => {
         .then(trx.commit)
         .catch(trx.rollback);
     }).catch(error => res.status(400).json('error removing user'));
-  });
-
-  /*-----------------------------
-    로그인
-  -----------------------------*/
-  app.post(
-    '/login',
-    passport.authenticate('local', { session: true }),
-    (req, res) => {
-      res.json(req.user);
-    }
-  );
-
-  /*-----------------------------
-    로그아웃
-  -----------------------------*/
-  app.get('/logout', (req, res) => {
-    if (req.user) {
-      req.logout();
-      res.json('로그아웃 되었습니다.');
-    } else {
-      res.status(400).json('이미 로그아웃 되었습니다.');
-    }
   });
 };

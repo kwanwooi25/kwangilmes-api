@@ -4,6 +4,7 @@ const {
   canReadProducts,
   canWriteProducts
 } = require('../middlewares/requirePermission');
+const { onRequestSuccess, onRequestFail } = require('../utils');
 
 const REQUIRED_PROPS = [
   'product_name',
@@ -83,191 +84,184 @@ module.exports = app => {
   /*-----------------------------
     전체 품목 조회
   -----------------------------*/
-  app.post(
-    '/products',
-    requireLogin,
-    canReadProducts,
-    (req, res) => {
-      const {
-        limit = 10,
-        offset = 0,
-        account_name = '',
-        product_name = '',
-        product_thick = '',
-        product_length = '',
-        product_width = '',
-        ext_color = '',
-        print_color = ''
-      } = req.body;
+  app.post('/products', requireLogin, canReadProducts, (req, res) => {
+    const {
+      limit = 10,
+      offset = 0,
+      account_name = '',
+      product_name = '',
+      product_thick = '',
+      product_length = '',
+      product_width = '',
+      ext_color = '',
+      print_color = ''
+    } = req.body;
 
-      db.select('*')
-        .from('accounts')
-        .join('products', 'accounts.id', 'products.account_id')
-        .where('account_name', 'like', `%${account_name}%`)
-        .andWhere('product_name', 'like', `%${product_name}%`)
-        .andWhere('product_thick', 'like', `%${product_thick}%`)
-        .andWhere('product_length', 'like', `%${product_length}%`)
-        .andWhere('product_width', 'like', `%${product_width}%`)
-        .andWhere('ext_color', 'like', `%${ext_color}%`)
-        .andWhere(function() {
-          this.where('print_front_color', 'like', `%${print_color}%`).orWhere(
-            'print_back_color',
-            'like',
-            `%${print_color}%`
-          );
-        })
-        .limit(limit)
-        .offset(offset)
-        .then(data => {
-          if (data.length) {
-            res.json(data);
-          } else {
-            res.status(400).json('표시할 결과가 없습니다.');
-          }
-        })
-        .catch(error => res.status(400).json('error fetching products'));
-    }
-  );
+    db.select('*')
+      .from('accounts')
+      .join('products', 'accounts.id', 'products.account_id')
+      .where('account_name', 'like', `%${account_name}%`)
+      .andWhere('product_name', 'like', `%${product_name}%`)
+      .andWhere('product_thick', 'like', `%${product_thick}%`)
+      .andWhere('product_length', 'like', `%${product_length}%`)
+      .andWhere('product_width', 'like', `%${product_width}%`)
+      .andWhere('ext_color', 'like', `%${ext_color}%`)
+      .andWhere(function() {
+        this.where('print_front_color', 'like', `%${print_color}%`).orWhere(
+          'print_back_color',
+          'like',
+          `%${print_color}%`
+        );
+      })
+      .limit(limit)
+      .offset(offset)
+      .then(data => {
+        if (data.length) {
+          res.json(onRequestSuccess(data));
+        } else {
+          res.status(400).json(onRequestFail('표시할 결과가 없습니다.'));
+        }
+      })
+      .catch(error =>
+        res.status(400).json(onRequestFail('error fetching products'))
+      );
+  });
 
   /*-----------------------------
     단일 품목 조회
   -----------------------------*/
-  app.get(
-    '/products/:id',
-    requireLogin,
-    canReadProducts,
-    (req, res) => {
-      const { id } = req.params;
+  app.get('/products/:id', requireLogin, canReadProducts, (req, res) => {
+    const { id } = req.params;
 
-      db.select('*')
-        .from('products')
-        .where('id', '=', id)
-        .then(product => {
-          if (product.length) {
-            res.json(product[0]);
-          } else {
-            res.status(400).json('존재하지 않는 품목입니다.');
-          }
-        })
-        .catch(error => res.status(400).json('error fetching a product'));
-    }
-  );
+    db.select('*')
+      .from('products')
+      .where('id', '=', id)
+      .then(product => {
+        if (product.length) {
+          res.json(onRequestSuccess(product[0]));
+        } else {
+          res.status(400).json(onRequestFail('존재하지 않는 품목입니다.'));
+        }
+      })
+      .catch(error =>
+        res.status(400).json(onRequestFail('error fetching a product'))
+      );
+  });
 
   /*-----------------------------
     품목 추가 (single, multi)
   -----------------------------*/
-  app.post(
-    '/products/add',
-    requireLogin,
-    canWriteProducts,
-    (req, res) => {
-      const data = req.body; // array of account object
+  app.post('/products/add', requireLogin, canWriteProducts, (req, res) => {
+    const data = req.body; // array of product object
 
-      // check required field
-      const isRequiredEmpty = data
-        .map(product => {
-          return REQUIRED_PROPS.map(prop => !!product[prop]).includes(false);
-        })
-        .includes(true);
+    // check required field
+    const isRequiredEmpty = data
+      .map(product => {
+        return REQUIRED_PROPS.map(prop => !!product[prop]).includes(false);
+      })
+      .includes(true);
 
-      if (isRequiredEmpty)
-        return res.status(400).json('필수항목을 입력해야 합니다.');
+    if (isRequiredEmpty)
+      return res.status(400).json(onRequestFail('필수항목을 입력해야 합니다.'));
 
-      // check if account id of product exists
-      Promise.all(
-        data.map(product =>
-          db('accounts')
-            .select('account_name')
-            .where('id', '=', product.account_id)
-            .then(response => !!response.length)
-        )
+    // check if account id of product exists
+    Promise.all(
+      data.map(product =>
+        db('accounts')
+          .select('account_name')
+          .where('id', '=', product.account_id)
+          .then(response => !!response.length)
       )
-        .then(results => results.includes(false))
-        .then(isAccountIdInvalid => {
-          if (isAccountIdInvalid) {
-            res.status(400).json('존재하지 않는 업체입니다.');
-          } else {
-            // 최초 생성일자 입력
-            data.forEach(product => {
-              product.product_created_at = new Date();
-            });
-            db.insert(data)
-              .into('products')
-              .returning('*')
-              .then(products => res.json(products))
-              .catch(error => res.status(400).json(error));
-          }
-        });
-    }
-  );
+    )
+      .then(results => results.includes(false))
+      .then(isAccountIdInvalid => {
+        if (isAccountIdInvalid) {
+          res.status(400).json(onRequestFail('존재하지 않는 업체입니다.'));
+        } else {
+          // 최초 생성일자 입력
+          data.forEach(product => {
+            product.product_created_at = new Date();
+          });
+          db.insert(data)
+            .into('products')
+            .returning('*')
+            .then(products => res.json(onRequestSuccess(products)))
+            .catch(error =>
+              res.status(400).json(onRequestFail('error adding products'))
+            );
+        }
+      });
+  });
 
   /*-----------------------------
     품목 정보 수정
   -----------------------------*/
-  app.put(
-    '/products/:id',
-    requireLogin,
-    canWriteProducts,
-    (req, res) => {
-      const { id } = req.params;
-      const data = req.body; // object containing product info
+  app.put('/products/:id', requireLogin, canWriteProducts, (req, res) => {
+    const { id } = req.params;
+    const data = req.body; // object containing product info
 
-      // remove property of incoming data if value is empty
-      REQUIRED_PROPS.forEach(prop => {
-        if (data[prop] === '') delete data[prop];
-      });
+    // remove property of incoming data if value is empty
+    REQUIRED_PROPS.forEach(prop => {
+      if (data[prop] === '') delete data[prop];
+    });
 
-      if (!Object.keys(data).length)
-        return res.status(400).json('수정할 항목이 없습니다.');
+    if (!Object.keys(data).length)
+      return res.status(400).json(onRequestFail('수정할 항목이 없습니다.'));
 
-      db('products')
-        .select('*')
-        .where('id', '=', id)
-        .then(response => {
-          db('accounts')
-            .select('account_name')
-            .where('id', '=', response[0].account_id)
-            .then(response => !!response.length)
-            .then(isAccountExist => {
-              if (isAccountExist) {
-                // 수정일자 입력
-                data.product_last_modified_at = new Date();
-                db('products')
-                  .where('id', '=', id)
-                  .update(data)
-                  .returning('*')
-                  .then(product => res.json(product))
-                  .catch(error => res.status(400).json(error));
-              } else {
-                res.status(400).json('존재하지 않는 업체명입니다.');
-              }
-            });
-        })
-        .catch(error => res.status(400).json('품목이 존재하지 않습니다.'));
-    }
-  );
+    db('products')
+      .select('*')
+      .where('id', '=', id)
+      .then(response => {
+        db('accounts')
+          .select('account_name')
+          .where('id', '=', response[0].account_id)
+          .then(response => !!response.length)
+          .then(isAccountExist => {
+            if (isAccountExist) {
+              // 수정일자 입력
+              data.product_last_modified_at = new Date();
+              db('products')
+                .where('id', '=', id)
+                .update(data)
+                .returning('*')
+                .then(product => res.json(onRequestSuccess(product)))
+                .catch(error =>
+                  res
+                    .status(400)
+                    .json(onRequestFail('error updating a product'))
+                );
+            } else {
+              res
+                .status(400)
+                .json(onRequestFail('존재하지 않는 업체명입니다.'));
+            }
+          });
+      })
+      .catch(error =>
+        res.status(400).json(onRequestFail('품목이 존재하지 않습니다.'))
+      );
+  });
 
   /*-----------------------------
     품목 삭제 (single, multi)
   -----------------------------*/
-  app.delete(
-    '/products',
-    requireLogin,
-    canWriteProducts,
-    (req, res) => {
-      const ids = req.body; // array of ids
+  app.delete('/products', requireLogin, canWriteProducts, (req, res) => {
+    const ids = req.body; // array of ids
 
-      if (ids.length) {
-        db('products')
-          .whereIn('id', ids)
-          .del()
-          .then(response =>
-            res.json(`${response}개 품목이 정상적으로 삭제되었습니다.`)
+    if (ids.length) {
+      db('products')
+        .whereIn('id', ids)
+        .del()
+        .then(response =>
+          res.json(
+            onRequestSuccess(`${response}개 품목이 정상적으로 삭제되었습니다.`)
           )
-          .catch(error => res.status(400).json('error deleting products'));
-      } else {
-        res.status(400).json('삭제할 품목 정보가 없습니다.');
-      }
+        )
+        .catch(error =>
+          res.status(400).json(onRequestFail('error deleting products'))
+        );
+    } else {
+      res.status(400).json(onRequestFail('삭제할 품목 정보가 없습니다.'));
     }
-  );
+  });
 };
