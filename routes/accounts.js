@@ -57,17 +57,22 @@ module.exports = app => {
     전체 거래처 조회
   -----------------------------*/
   app.post('/accounts', requireLogin, canReadAccounts, (req, res) => {
-    const { limit = 10, offset = 0, searchTerm = '' } = req.body;
+    const {
+      account_name = '',
+      limit = 10,
+      offset = 0
+    } = req.body;
 
     db.select('*')
       .from('accounts')
-      .where('account_name', 'like', `%${searchTerm}%`)
+      .where('account_name', 'like', `%${account_name}%`)
       .limit(limit)
       .offset(offset)
       .then(accounts => {
         if (accounts.length) {
           db('accounts')
-            .count('account_name', 'like', `%${searchTerm}%`)
+            .where('account_name', 'like', `%${account_name}%`)
+            .count(`id`)
             .then(result => {
               const data = { count: result[0].count, accounts };
               res.json(onRequestSuccess(data));
