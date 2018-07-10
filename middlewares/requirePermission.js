@@ -1,4 +1,5 @@
 const db = require('../database');
+const { onRequestSuccess, onRequestFail } = require('../utils');
 
 const requirePermission = (permission_id, permission_type) => {
   return new Promise((resolve, reject) => {
@@ -20,110 +21,110 @@ const requirePermission = (permission_id, permission_type) => {
 
 // can_read_users
 const canReadUsers = (req, res, next) => {
-  requirePermission(req.user.permission_id, 'can_read_users')
+  requirePermission(req.decoded.permission_id, 'can_read_users')
     .then(isPermitted => {
       if (isPermitted) next();
     })
-    .catch(error => res.status(401).json(error));
+    .catch(error => res.status(401).json(onRequestFail(error)));
 }
 
 // can_write_users
 const canWriteUsers = (req, res, next) => {
-  requirePermission(req.user.permission_id, 'can_write_users')
+  requirePermission(req.decoded.permission_id, 'can_write_users')
     .then(isPermitted => {
       if (isPermitted) next();
     })
-    .catch(error => res.status(401).json(error));
+    .catch(error => res.status(401).json(onRequestFail(error)));
 };
 
 // can_read_accounts
 const canReadAccounts = (req, res, next) => {
-  requirePermission(req.user.permission_id, 'can_read_accounts')
+  requirePermission(req.decoded.permission_id, 'can_read_accounts')
     .then(isPermitted => {
       if (isPermitted) next();
     })
-    .catch(error => res.status(401).json(error));
+    .catch(error => res.status(401).json(onRequestFail(error)));
 }
 
 // can_write_accounts
 const canWriteAccounts = (req, res, next) => {
-  requirePermission(req.user.permission_id, 'can_write_accounts')
+  requirePermission(req.decoded.permission_id, 'can_write_accounts')
     .then(isPermitted => {
       if (isPermitted) next();
     })
-    .catch(error => res.status(401).json(error));
+    .catch(error => res.status(401).json(onRequestFail(error)));
 }
 
 // can_read_products
 const canReadProducts = (req, res, next) => {
-  requirePermission(req.user.permission_id, 'can_read_products')
+  requirePermission(req.decoded.permission_id, 'can_read_products')
     .then(isPermitted => {
       if (isPermitted) next();
     })
-    .catch(error => res.status(401).json(error));
+    .catch(error => res.status(401).json(onRequestFail(error)));
 }
 
 // can_write_products
 const canWriteProducts = (req, res, next) => {
-  requirePermission(req.user.permission_id, 'can_write_products')
+  requirePermission(req.decoded.permission_id, 'can_write_products')
     .then(isPermitted => {
       if (isPermitted) next();
     })
-    .catch(error => res.status(401).json(error));
+    .catch(error => res.status(401).json(onRequestFail(error)));
 }
 
 // can_read_plates
 const canReadPlates = (req, res, next) => {
-  requirePermission(req.user.permission_id, 'can_read_plates')
+  requirePermission(req.decoded.permission_id, 'can_read_plates')
     .then(isPermitted => {
       if (isPermitted) next();
     })
-    .catch(error => res.status(401).json(error));
+    .catch(error => res.status(401).json(onRequestFail(error)));
 }
 
 // can_write_plates
 const canWritePlates = (req, res, next) => {
-  requirePermission(req.user.permission_id, 'can_write_plates')
+  requirePermission(req.decoded.permission_id, 'can_write_plates')
     .then(isPermitted => {
       if (isPermitted) next();
     })
-    .catch(error => res.status(401).json(error));
+    .catch(error => res.status(401).json(onRequestFail(error)));
 }
 
 // can_read_orders
 const canReadOrders = (req, res, next) => {
-  requirePermission(req.user.permission_id, 'can_read_orders')
+  requirePermission(req.decoded.permission_id, 'can_read_orders')
     .then(isPermitted => {
       if (isPermitted) next();
     })
-    .catch(error => res.status(401).json(error));
+    .catch(error => res.status(401).json(onRequestFail(error)));
 }
 
 // can_write_orders
 const canWriteOrders = (req, res, next) => {
-  requirePermission(req.user.permission_id, 'can_write_orders')
+  requirePermission(req.decoded.permission_id, 'can_write_orders')
     .then(isPermitted => {
       if (isPermitted) next();
     })
-    .catch(error => res.status(401).json(error));
+    .catch(error => res.status(401).json(onRequestFail(error)));
 }
 
 // can_read_permission
 const canReadPermission = (req, res, next) => {
-  requirePermission(req.user.permission_id, 'can_read_permission')
+  requirePermission(req.decoded.permission_id, 'can_read_permission')
     .then(isPermitted => {
       if (isPermitted) next();
     })
-    .catch(error => res.status(401).json(error));
+    .catch(error => res.status(401).json(onRequestFail(error)));
 }
 
 // can_write_permission
 const canWritePermission = (req, res, next) => {
-  requirePermission(req.user.permission_id, 'can_write_permission')
+  requirePermission(req.decoded.permission_id, 'can_write_permission')
     .then(isPermitted => {
       if (isPermitted) next();
     })
-    .catch(error => res.status(401).json(error));
+    .catch(error => res.status(401).json(onRequestFail(error)));
 }
 
 module.exports = {

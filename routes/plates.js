@@ -4,6 +4,8 @@ const {
   canReadPlates,
   canWritePlates
 } = require('../middlewares/requirePermission');
+const { onRequestSuccess, onRequestFail } = require('../utils');
+
 const REQUIRED_PROPS = ['product_1', 'round', 'length', 'material'];
 const { SAMPLE_PLATES } = require('../fixture');
 
@@ -50,154 +52,141 @@ module.exports = app => {
   /*-----------------------------
     전체 동판 조회
   -----------------------------*/
-  app.post(
-    '/plates',
-    requireLogin,
-    canReadPlates,
-    (req, res) => {
-      const { limit = 10, offset = 0 } = req.body;
-      const {
-        plate_round = '',
-        plate_length = '',
-        plate_material = '',
-        product_name = ''
-      } = req.body.search;
+  app.post('/plates', requireLogin, canReadPlates, (req, res) => {
+    const { limit = 10, offset = 0 } = req.body;
+    const {
+      plate_round = '',
+      plate_length = '',
+      plate_material = '',
+      product_name = ''
+    } = req.body.search;
 
-      db.select('id')
-        .from('products')
-        .where('product_name', 'like', `%${product_name}%`)
-        .then(results => {
-          const ids = results.map(result => result.id);
+    db.select('id')
+      .from('products')
+      .where('product_name', 'like', `%${product_name}%`)
+      .then(results => {
+        const ids = results.map(result => result.id);
 
-          db('plates')
-            .where('plate_round', 'like', `%${plate_round}%`)
-            .andWhere('plate_length', 'like', `%${plate_length}%`)
-            .andWhere('plate_material', 'like', `%${plate_material}%`)
-            .andWhere(function() {
-              this.whereIn('product_1', ids)
-                .orWhereIn('product_2', ids)
-                .orWhereIn('product_3', ids);
-            })
-            .then(plates => {
-              if (plates.length) {
-                res.json(plates);
-              } else {
-                res.status(400).json('표시할 결과가 없습니다.');
-              }
-            });
-        })
-        .catch(error => res.status(400).json('error fetching plates'));
-    }
-  );
+        db('plates')
+          .where('plate_round', 'like', `%${plate_round}%`)
+          .andWhere('plate_length', 'like', `%${plate_length}%`)
+          .andWhere('plate_material', 'like', `%${plate_material}%`)
+          .andWhere(function() {
+            this.whereIn('product_1', ids)
+              .orWhereIn('product_2', ids)
+              .orWhereIn('product_3', ids);
+          })
+          .then(plates => {
+            if (plates.length) {
+              res.json(onRequestSuccess(plates));
+            } else {
+              res.status(400).json(onRequestFail('표시할 결과가 없습니다.'));
+            }
+          });
+      })
+      .catch(error =>
+        res.status(400).json(onRequestFail('error fetching plates'))
+      );
+  });
 
   /*-----------------------------
     단일 동판 조회
   -----------------------------*/
-  app.get(
-    '/plates/:id',
-    requireLogin,
-    canReadPlates,
-    (req, res) => {
-      const { id } = req.params;
+  app.get('/plates/:id', requireLogin, canReadPlates, (req, res) => {
+    const { id } = req.params;
 
-      db.select('*')
-        .from('plates')
-        .where('id', '=', id)
-        .then(plate => {
-          if (plate.length) {
-            res.json(plate[0]);
-          } else {
-            res.status(400).json('존재하지 않는 동판입니다.');
-          }
-        })
-        .catch(error => res.status(400).json('error fetching a plate'));
-    }
-  );
+    db.select('*')
+      .from('plates')
+      .where('id', '=', id)
+      .then(plate => {
+        if (plate.length) {
+          res.json(onRequestSuccess(plate[0]));
+        } else {
+          res.status(400).json(onRequestFail('존재하지 않는 동판입니다.'));
+        }
+      })
+      .catch(error =>
+        res.status(400).json(onRequestFail('error fetching a plate'))
+      );
+  });
 
   /*-----------------------------
     동판 추가 (single, multi)
   -----------------------------*/
-  app.post(
-    '/plates/add',
-    requireLogin,
-    canWritePlates,
-    (req, res) => {
-      const data = req.body; // array of plate object
+  app.post('/plates/add', requireLogin, canWritePlates, (req, res) => {
+    const data = req.body; // array of plate object
 
-      // check required field
-      const isRequiredEmpty = data
-        .map(plate => {
-          return REQUIRED_PROPS.map(prop => !!plate[prop]).includes(false);
-        })
-        .includes(true);
+    // check required field
+    const isRequiredEmpty = data
+      .map(plate => {
+        return REQUIRED_PROPS.map(prop => !!plate[prop]).includes(false);
+      })
+      .includes(true);
 
-      if (isRequiredEmpty) {
-        res.status(400).json('필수항목을 입력해야 합니다.');
-      } else {
-        // 최초 생성일자 입력
-        data.forEach(plate => {
-          plate.plate_created_at = new Date();
-        });
-        db.insert(data)
-          .into('plates')
-          .returning('*')
-          .then(plates => res.json(plates))
-          .catch(error => res.status(400).json(error));
-      }
+    if (isRequiredEmpty) {
+      res.status(400).json(onRequestFail('필수항목을 입력해야 합니다.'));
+    } else {
+      // 최초 생성일자 입력
+      data.forEach(plate => {
+        plate.plate_created_at = new Date();
+      });
+      db.insert(data)
+        .into('plates')
+        .returning('*')
+        .then(plates => res.json(onRequestSuccess(plates)))
+        .catch(error =>
+          res.status(400).json(onRequestFail('error adding plates'))
+        );
     }
-  );
+  });
 
   /*-----------------------------
     동판 정보 수정
   -----------------------------*/
-  app.put(
-    '/plates/:id',
-    requireLogin,
-    canWritePlates,
-    (req, res) => {
-      const { id } = req.params;
-      const data = req.body; // object containing plate info
+  app.put('/plates/:id', requireLogin, canWritePlates, (req, res) => {
+    const { id } = req.params;
+    const data = req.body; // object containing plate info
 
-      // remove property of incoming data if value is empty
-      REQUIRED_PROPS.forEach(prop => {
-        if (data[prop] === '') delete data[prop];
-      });
+    // remove property of incoming data if value is empty
+    REQUIRED_PROPS.forEach(prop => {
+      if (data[prop] === '') delete data[prop];
+    });
 
-      if (!Object.keys(data).length)
-        return res.status(400).json('수정할 항목이 없습니다.');
+    if (!Object.keys(data).length)
+      return res.status(400).json(onRequestFail('수정할 항목이 없습니다.'));
 
-      // 수정일자 입력
-      data.plate_last_modified_at = new Date();
-      db('plates')
-        .where('id', '=', id)
-        .update(data)
-        .returning('*')
-        .then(plate => res.json(plate))
-        .catch(error => res.status(400).json('error updating plate'));
-    }
-  );
+    // 수정일자 입력
+    data.plate_last_modified_at = new Date();
+    db('plates')
+      .where('id', '=', id)
+      .update(data)
+      .returning('*')
+      .then(plate => res.json(onRequestSuccess(plate)))
+      .catch(error =>
+        res.status(400).json(onRequestFail('error updating plate'))
+      );
+  });
 
   /*-----------------------------
     동판 삭제 (single, multi)
   -----------------------------*/
-  app.delete(
-    '/plates',
-    requireLogin,
-    canWritePlates,
-    (req, res) => {
-      const ids = req.body; // array of ids
+  app.delete('/plates', requireLogin, canWritePlates, (req, res) => {
+    const ids = req.body; // array of ids
 
-      if (ids.length) {
-        db('plates')
-          .whereIn('id', ids)
-          .del()
-          .then(response =>
-            res.json(`${response}개 동판이 정상적으로 삭제되었습니다.`)
+    if (ids.length) {
+      db('plates')
+        .whereIn('id', ids)
+        .del()
+        .then(response =>
+          res.json(
+            onRequestSuccess(`${response}개 동판이 정상적으로 삭제되었습니다.`)
           )
-          .catch(error => res.status(400).json('error deleting plates'));
-      } else {
-        res.status(400).json('삭제할 동판 정보가 없습니다.');
-      }
+        )
+        .catch(error =>
+          res.status(400).json(onRequestFail('error deleting plates'))
+        );
+    } else {
+      res.status(400).json(onRequestFail('삭제할 동판 정보가 없습니다.'));
     }
-  );
+  });
 };
