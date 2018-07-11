@@ -70,11 +70,12 @@ module.exports = app => {
       .offset(offset)
       .then(accounts => {
         if (accounts.length) {
-          db('accounts')
+          db.select('id')
+            .from('accounts')
             .where('account_name', 'like', `%${account_name}%`)
-            .count(`id`)
             .then(result => {
-              const data = { count: result[0].count, accounts };
+              const ids = result.map(({ id }) => id);
+              const data = { count: result.length, ids, accounts };
               res.json(onRequestSuccess(data));
             });
         } else {
