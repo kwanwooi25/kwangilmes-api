@@ -57,11 +57,7 @@ module.exports = app => {
     전체 거래처 조회
   -----------------------------*/
   app.post('/accounts', requireLogin, canReadAccounts, (req, res) => {
-    const {
-      account_name = '',
-      limit = 10,
-      offset = 0
-    } = req.body;
+    const { account_name = '', limit = 10, offset = 0 } = req.body;
 
     db.select('*')
       .from('accounts')
@@ -79,7 +75,7 @@ module.exports = app => {
               res.json(onRequestSuccess(data));
             });
         } else {
-          const data = { count: 0, accounts: [] }
+          const data = { count: 0, accounts: [] };
           res.json(onRequestSuccess(data));
         }
       })
@@ -115,25 +111,44 @@ module.exports = app => {
   app.post('/accounts/add', requireLogin, canWriteAccounts, (req, res) => {
     const data = req.body; // array of account object
 
-    const isNameEmpty = data
-      .map(account => !!account.account_name)
-      .includes(false);
+    let isNameNotEmpty = true;
+    let isNameValid = true;
 
-    if (isNameEmpty) {
-      res.status(400).json(onRequestFail('업체명을 입력해야 합니다.'));
-    } else {
-      // 최초 생성일자 입력
-      data.forEach(account => {
-        account.account_created_at = new Date();
-      });
-      db.insert(data)
-        .into('accounts')
-        .returning('*')
-        .then(accounts => res.json(onRequestSuccess(accounts)))
-        .catch(error =>
-          res.status(400).json(onRequestFail('error adding accounts'))
-        );
-    }
+    Promise.all(
+      data.map(account => {
+        // 업체명 비어있지 않은지 확인
+        if (!account.account_name) {
+          isNameNotEmpty = isNameNotEmpty && false;
+        }
+
+        // 업체명 기존에 존재하는지 확인
+        return db
+          .select('id')
+          .from('accounts')
+          .where('account_name', '=', account.account_name)
+          .then(result => {
+            isNameValid = isNameValid && result.length === 0;
+          });
+      })
+    ).then(() => {
+      if (!isNameNotEmpty) {
+        res.status(400).json(onRequestFail('업체명을 입력해야 합니다.'));
+      } else if (!isNameValid) {
+        res.status(400).json(onRequestFail('이미 존재하는 업체명입니다.'));
+      } else {
+        // 최초 생성일자 입력
+        data.forEach(account => {
+          account.account_created_at = new Date();
+        });
+        db.insert(data)
+          .into('accounts')
+          .returning('*')
+          .then(accounts => res.json(onRequestSuccess(accounts)))
+          .catch(error =>
+            res.status(400).json(onRequestFail('error adding accounts'))
+          );
+      }
+    });
   });
 
   /*-----------------------------
