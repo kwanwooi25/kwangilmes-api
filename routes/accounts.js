@@ -59,8 +59,9 @@ module.exports = app => {
   app.post('/accounts', requireLogin, canReadAccounts, (req, res) => {
     const { account_name = '', limit = 10, offset = 0 } = req.body;
 
-    db.select('*')
-      .from('accounts')
+    db('accounts')
+      .orderBy('account_name', 'asc')
+      .select('*')
       .where('account_name', 'like', `%${account_name}%`)
       .limit(limit)
       .offset(offset)
