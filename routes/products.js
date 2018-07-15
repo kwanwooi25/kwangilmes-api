@@ -113,11 +113,32 @@ module.exports = app => {
           `%${print_color}%`
         );
       })
+      .orderBy('product_name', 'asc')
       .limit(limit)
       .offset(offset)
-      .then(data => {
-        if (data.length) {
-          res.json(onRequestSuccess(data));
+      .then(products => {
+        if (products.length) {
+          db.select('*')
+            .from('accounts')
+            .join('products', 'accounts.id', 'products.account_id')
+            .where('account_name', 'like', `%${account_name}%`)
+            .andWhere('product_name', 'like', `%${product_name}%`)
+            .andWhere('product_thick', 'like', `%${product_thick}%`)
+            .andWhere('product_length', 'like', `%${product_length}%`)
+            .andWhere('product_width', 'like', `%${product_width}%`)
+            .andWhere('ext_color', 'like', `%${ext_color}%`)
+            .andWhere(function() {
+              this.where(
+                'print_front_color',
+                'like',
+                `%${print_color}%`
+              ).orWhere('print_back_color', 'like', `%${print_color}%`);
+            })
+            .then(result => {
+              const ids = result.map(product => product.id);
+              const data = { count: result.length, ids, products };
+              res.json(onRequestSuccess(data));
+            });
         } else {
           res.status(400).json(onRequestFail('표시할 결과가 없습니다.'));
         }
