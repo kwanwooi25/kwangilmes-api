@@ -13,6 +13,7 @@ module.exports = app => {
   -----------------------------------------
   POST    /accounts      전체 거래처 조회
   GET     /accounts/:id  단일 거래처 조회
+  GET     /accounts      거래처명 조회
   POST    /accounts/add  거래처 추가
   PUT     /accounts/:id  거래처 정보 수정
   DELETE  /accounts      거래처 삭제
@@ -101,6 +102,20 @@ module.exports = app => {
           res.status(400).json(onRequestFail('존재하지 않는 업체입니다.'));
         }
       })
+      .catch(error =>
+        res.status(400).json(onRequestFail('error fetching an account'))
+      );
+  });
+
+  /*-----------------------------
+    거래처명 조회
+  -----------------------------*/
+  app.get('/accounts', requireLogin, (req, res) => {
+
+    db.select('id', 'account_name')
+      .from('accounts')
+      .orderBy('account_name', 'asc')
+      .then(accounts => res.json(onRequestSuccess(accounts)))
       .catch(error =>
         res.status(400).json(onRequestFail('error fetching an account'))
       );
