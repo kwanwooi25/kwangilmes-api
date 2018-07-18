@@ -140,7 +140,8 @@ module.exports = app => {
               res.json(onRequestSuccess(data));
             });
         } else {
-          res.status(400).json(onRequestFail('표시할 결과가 없습니다.'));
+          const data = { count: 0, ids: [], products: [] };
+          res.json(onRequestSuccess(data));
         }
       })
       .catch(error =>
