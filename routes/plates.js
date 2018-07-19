@@ -53,13 +53,14 @@ module.exports = app => {
     전체 동판 조회
   -----------------------------*/
   app.post('/plates', requireLogin, canReadPlates, (req, res) => {
-    const { limit = 10, offset = 0 } = req.body;
     const {
       plate_round = '',
       plate_length = '',
       plate_material = '',
-      product_name = ''
-    } = req.body.search;
+      product_name = '',
+      limit = 10,
+      offset = 0
+    } = req.body;
 
     db.select('id')
       .from('products')
@@ -76,11 +77,19 @@ module.exports = app => {
               .orWhereIn('product_2', ids)
               .orWhereIn('product_3', ids);
           })
+          .orderBy('plate_round', 'asc')
           .then(plates => {
             if (plates.length) {
-              res.json(onRequestSuccess(plates));
+              const ids = plates.map(plate => plate.id);
+              const data = {
+                count: plates.length,
+                ids,
+                plates: plates.slice(offset, offset + limit)
+              };
+              res.json(onRequestSuccess(data));
             } else {
-              res.status(400).json(onRequestFail('표시할 결과가 없습니다.'));
+              const data = { count: 0, ids: [], plates: [] };
+              res.json(onRequestSuccess(data));
             }
           });
       })
