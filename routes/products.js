@@ -21,6 +21,7 @@ module.exports = app => {
   ROUTES
   -----------------------------------------
   POST    /products      전체 품목 조회
+  GET     /products      인쇄 품목 조회
   GET     /products/:id  단일 품목 조회
   POST    /products/add  품목 추가
   PUT     /products/:id  품목 정보 수정
@@ -114,31 +115,51 @@ module.exports = app => {
         );
       })
       .orderBy('product_name', 'asc')
-      .limit(limit)
-      .offset(offset)
       .then(products => {
         if (products.length) {
-          db.select('*')
-            .from('accounts')
-            .join('products', 'accounts.id', 'products.account_id')
-            .where('account_name', 'like', `%${account_name}%`)
-            .andWhere('product_name', 'like', `%${product_name}%`)
-            .andWhere('product_thick', 'like', `%${product_thick}%`)
-            .andWhere('product_length', 'like', `%${product_length}%`)
-            .andWhere('product_width', 'like', `%${product_width}%`)
-            .andWhere('ext_color', 'like', `%${ext_color}%`)
-            .andWhere(function() {
-              this.where(
-                'print_front_color',
-                'like',
-                `%${print_color}%`
-              ).orWhere('print_back_color', 'like', `%${print_color}%`);
-            })
-            .then(result => {
-              const ids = result.map(product => product.id);
-              const data = { count: result.length, ids, products };
-              res.json(onRequestSuccess(data));
-            });
+          const ids = products.map(product => product.id);
+          const data = {
+            count: products.length,
+            ids,
+            products: products.slice(offset, offset + limit)
+          };
+          res.json(onRequestSuccess(data));
+        } else {
+          const data = { count: 0, ids: [], products: [] };
+          res.json(onRequestSuccess(data));
+        }
+      })
+      .catch(error =>
+        res.status(400).json(onRequestFail('error fetching products'))
+      );
+  });
+
+  /*-----------------------------
+    인쇄 품목 조회
+  -----------------------------*/
+  app.get('/products', requireLogin, canReadProducts, (req, res) => {
+    const { product_name } = req.query;
+
+    db.select(
+      'id',
+      'product_name',
+      'product_thick',
+      'product_length',
+      'product_width'
+    )
+      .from('products')
+      .where('is_print', '=', true)
+      .andWhere('product_name', 'like', `%${product_name}%`)
+      .orderBy('product_name', 'asc')
+      .then(products => {
+        if (products.length) {
+          const ids = products.map(product => product.id);
+          const data = {
+            count: products.length,
+            ids,
+            products
+          };
+          res.json(onRequestSuccess(data));
         } else {
           const data = { count: 0, ids: [], products: [] };
           res.json(onRequestSuccess(data));
