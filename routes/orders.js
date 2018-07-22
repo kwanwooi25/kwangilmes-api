@@ -98,10 +98,13 @@ module.exports = app => {
       show_completed = false
     } = req.body;
 
-    db('accounts')
-      .join('products', 'accounts.id', '=', 'products.account_id')
-      .join('orders', 'products.id', '=', 'orders.product_id')
-      .orderBy('orders.id')
+    const joinedTable = db.raw(
+      'select orders.*, accounts.account_name, accounts.phone, accounts.fax, accounts.email, accounts.email_tax, accounts.address, accounts.reg_no, accounts.ceo_name, accounts.ceo_phone, accounts.ceo_email, accounts.manager_name, accounts.manager_phone, accounts.manager_email, accounts.account_memo ,products.product_name, products.product_thick, products.product_length, products.product_width, products.is_print, products.ext_color, products.ext_antistatic, products.ext_pretreat, products.ext_memo, products.print_front_color_count, products.print_front_color, products.print_front_position, products.print_back_color_count, products.print_back_color, products.print_back_position, products.print_image_url, products.print_memo, products.cut_position, products.cut_ultrasonic, products.cut_powder_pack, products.cut_is_punched, products.cut_punch_count, products.cut_punch_size, products.cut_punch_position, products.cut_memo, products.pack_material, products.pack_unit, products.pack_deliver_all, products.pack_memo, products.unit_price, products.old_history, products.product_memo from orders left join accounts on accounts.id = orders.account_id left join products on products.id = orders.product_id order by orders.id'
+    );
+
+    db.with('joinedTable', joinedTable)
+      .select('*')
+      .from('joinedTable')
       .whereBetween('ordered_at', [date_from, date_to])
       .andWhere('account_name', 'like', `%${account_name}%`)
       .andWhere('product_name', 'like', `%${product_name}%`)
@@ -111,13 +114,18 @@ module.exports = app => {
       .andWhere(function() {
         if (show_completed === false) this.where('is_completed', false);
       })
-      .limit(limit)
-      .offset(offset)
-      .then(data => {
-        if (data.length) {
+      .then(orders => {
+        if (orders.length) {
+          const ids = orders.map(order => order.id);
+          const data = {
+            count: orders.length,
+            ids,
+            orders: orders.slice(offset, offset + limit)
+          };
           res.json(onRequestSuccess(data));
         } else {
-          res.status(400).json(onRequestFail('표시할 결과가 없습니다.'));
+          const data = { count: 0, ids: [], orders: [] };
+          res.json(onRequestSuccess(data));
         }
       })
       .catch(error =>

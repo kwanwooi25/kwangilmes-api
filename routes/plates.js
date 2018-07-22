@@ -6,7 +6,7 @@ const {
 } = require('../middlewares/requirePermission');
 const { onRequestSuccess, onRequestFail } = require('../utils');
 
-const REQUIRED_PROPS = ['product_1', 'round', 'length', 'material'];
+const REQUIRED_PROPS = ['plate_round', 'plate_length', 'plate_material'];
 const { SAMPLE_PLATES } = require('../fixture');
 
 module.exports = app => {
