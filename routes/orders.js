@@ -10,15 +10,20 @@ const { onRequestSuccess, onRequestFail } = require('../utils');
 const { SAMPLE_ORDERS } = require('../fixture');
 const REQUIRED_PROPS = ['product_id', 'order_quantity'];
 
+const joinedTable = db.raw(
+  'select orders.*, accounts.account_name, accounts.phone, accounts.fax, accounts.email, accounts.email_tax, accounts.address, accounts.reg_no, accounts.ceo_name, accounts.ceo_phone, accounts.ceo_email, accounts.manager_name, accounts.manager_phone, accounts.manager_email, accounts.account_memo ,products.product_name, products.product_thick, products.product_length, products.product_width, products.is_print, products.ext_color, products.ext_antistatic, products.ext_pretreat, products.ext_memo, products.print_front_color_count, products.print_front_color, products.print_front_position, products.print_back_color_count, products.print_back_color, products.print_back_position, products.print_image_url, products.print_memo, products.cut_position, products.cut_ultrasonic, products.cut_powder_pack, products.cut_is_punched, products.cut_punch_count, products.cut_punch_size, products.cut_punch_position, products.cut_memo, products.pack_material, products.pack_unit, products.pack_deliver_all, products.pack_memo, products.unit_price, products.old_history, products.product_memo from orders left join accounts on accounts.id = orders.account_id left join products on products.id = orders.product_id order by orders.id'
+);
+
 module.exports = app => {
   /*=======================================
   ROUTES
   -----------------------------------------
-  POST    /orders      전체 주문 조회
-  GET     /orders/:id  단일 주문 조회
-  POST    /orders/add  주문 추가
-  PUT     /orders/:id  주문 정보 수정
-  DELETE  /orders      주문 삭제
+  POST    /orders        전체 주문 조회
+  POST    /orders-by-ids 전체 주문 조회 (ID조회)
+  GET     /orders/:id    단일 주문 조회
+  POST    /orders/add    주문 추가
+  PUT     /orders/:id    주문 정보 수정
+  DELETE  /orders        주문 삭제
   =========================================*/
 
   // Create table if table does not exist
@@ -98,10 +103,6 @@ module.exports = app => {
       show_completed = false
     } = req.body;
 
-    const joinedTable = db.raw(
-      'select orders.*, accounts.account_name, accounts.phone, accounts.fax, accounts.email, accounts.email_tax, accounts.address, accounts.reg_no, accounts.ceo_name, accounts.ceo_phone, accounts.ceo_email, accounts.manager_name, accounts.manager_phone, accounts.manager_email, accounts.account_memo ,products.product_name, products.product_thick, products.product_length, products.product_width, products.is_print, products.ext_color, products.ext_antistatic, products.ext_pretreat, products.ext_memo, products.print_front_color_count, products.print_front_color, products.print_front_position, products.print_back_color_count, products.print_back_color, products.print_back_position, products.print_image_url, products.print_memo, products.cut_position, products.cut_ultrasonic, products.cut_powder_pack, products.cut_is_punched, products.cut_punch_count, products.cut_punch_size, products.cut_punch_position, products.cut_memo, products.pack_material, products.pack_unit, products.pack_deliver_all, products.pack_memo, products.unit_price, products.old_history, products.product_memo from orders left join accounts on accounts.id = orders.account_id left join products on products.id = orders.product_id order by orders.id'
-    );
-
     db.with('joinedTable', joinedTable)
       .select('*')
       .from('joinedTable')
@@ -126,6 +127,28 @@ module.exports = app => {
         } else {
           const data = { count: 0, ids: [], orders: [] };
           res.json(onRequestSuccess(data));
+        }
+      })
+      .catch(error =>
+        res.status(400).json(onRequestFail('error fetching orders'))
+      );
+  });
+
+  /*-----------------------------
+    전체 주문 조회 (ID로 조회)
+  -----------------------------*/
+  app.post('/orders-by-ids', requireLogin, canReadOrders, (req, res) => {
+    const ids = req.body;
+
+    db.with('joinedTable', joinedTable)
+      .select('*')
+      .from('joinedTable')
+      .whereIn('id', ids)
+      .then(orders => {
+        if (orders.length) {
+          res.json(onRequestSuccess(orders));
+        } else {
+          res.json(onRequestFail('no order to show'));
         }
       })
       .catch(error =>
