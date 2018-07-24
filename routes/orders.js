@@ -18,12 +18,13 @@ module.exports = app => {
   /*=======================================
   ROUTES
   -----------------------------------------
-  POST    /orders        전체 주문 조회
-  POST    /orders-by-ids 전체 주문 조회 (ID조회)
-  GET     /orders/:id    단일 주문 조회
-  POST    /orders/add    주문 추가
-  PUT     /orders/:id    주문 정보 수정
-  DELETE  /orders        주문 삭제
+  POST    /orders            전체 주문 조회
+  POST    /orders-by-ids     전체 주문 조회 (ID조회)
+  GET     /orders/:id        단일 주문 조회
+  POST    /orders/add        주문 추가
+  PUT     /orders/:id        주문 정보 수정
+  PUT     /orders-complete   작업 완료 처리
+  DELETE  /orders            주문 삭제
   =========================================*/
 
   // Create table if table does not exist
@@ -303,7 +304,7 @@ module.exports = app => {
   -----------------------------*/
   app.put('/orders/:id', requireLogin, canWriteOrders, (req, res) => {
     const { id } = req.params;
-    const data = req.body; // object containing product info
+    const data = req.body; // object containing order info
     console.log(data);
 
     // remove property of incoming data if value is empty
@@ -378,6 +379,25 @@ module.exports = app => {
           });
       })
       .catch(error => res.status(400).json('error updating an order'));
+  });
+
+  /*-----------------------------
+    작업 완료 처리
+  -----------------------------*/
+  app.put('/orders-complete', requireLogin, canWriteOrders, (req, res) => {
+    const data = req.body; // object containing order info
+
+    Promise.all(
+      data.map(order => {
+        return db('orders')
+          .where('id', '=', order.id)
+          .update(order)
+          .returning('*')
+          .then(result => result[0]);
+      })
+    )
+      .then(orders => res.json(onRequestSuccess(orders)))
+      .catch(error => res.status(400).json('error completing orders'));
   });
 
   /*-----------------------------
