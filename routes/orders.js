@@ -18,13 +18,14 @@ module.exports = app => {
   /*=======================================
   ROUTES
   -----------------------------------------
-  POST    /orders            전체 주문 조회
-  POST    /orders-by-ids     전체 주문 조회 (ID조회)
-  GET     /orders/:id        단일 주문 조회
-  POST    /orders/add        주문 추가
-  PUT     /orders/:id        주문 정보 수정
-  PUT     /orders-complete   작업 완료 처리
-  DELETE  /orders            주문 삭제
+  POST    /orders                전체 주문 조회
+  POST    /orders-by-ids         전체 주문 조회 (ID조회)
+  GET     /orders-by-product/:id 전체 주문 조회 (품목조회)
+  GET     /orders/:id            단일 주문 조회
+  POST    /orders/add            주문 추가
+  PUT     /orders/:id            주문 정보 수정
+  PUT     /orders-complete       작업 완료 처리
+  DELETE  /orders                주문 삭제
   =========================================*/
 
   // Create table if table does not exist
@@ -145,6 +146,28 @@ module.exports = app => {
       .select('*')
       .from('joinedTable')
       .whereIn('id', ids)
+      .then(orders => {
+        if (orders.length) {
+          res.json(onRequestSuccess(orders));
+        } else {
+          res.json(onRequestFail('no order to show'));
+        }
+      })
+      .catch(error =>
+        res.status(400).json(onRequestFail('error fetching orders'))
+      );
+  });
+
+  /*-----------------------------
+    전체 주문 조회 (품목별 조회)
+  -----------------------------*/
+  app.get('/orders-by-product/:id', requireLogin, canReadOrders, (req, res) => {
+    const { id } = req.params;
+
+    db.with('joinedTable', joinedTable)
+      .select('*')
+      .from('joinedTable')
+      .where('product_id', '=',id)
       .then(orders => {
         if (orders.length) {
           res.json(onRequestSuccess(orders));
