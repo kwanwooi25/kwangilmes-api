@@ -24,12 +24,13 @@ module.exports = app => {
   /*=======================================
   ROUTES
   -----------------------------------------
-  POST    /products      전체 품목 조회
-  GET     /products      인쇄 품목 조회
-  GET     /products/:id  단일 품목 조회
-  POST    /products/add  품목 추가
-  PUT     /products/:id  품목 정보 수정
-  DELETE  /products      품목 삭제
+  POST    /products          전체 품목 조회
+  POST    /products-for-xls  전체 품목 조회
+  GET     /products          인쇄 품목 조회
+  GET     /products/:id      단일 품목 조회
+  POST    /products/add      품목 추가
+  PUT     /products/:id      품목 정보 수정
+  DELETE  /products          품목 삭제
   =========================================*/
 
   // Create table if table does not exist
@@ -140,7 +141,7 @@ module.exports = app => {
   /*-----------------------------
     전체 품목 조회 (엑셀추출용)
   -----------------------------*/
-  app.post('/products/for-xls', requireLogin, canReadProducts, (req, res) => {
+  app.post('/products-for-xls', requireLogin, canReadProducts, (req, res) => {
     const {
       account_name = '',
       product_name = '',

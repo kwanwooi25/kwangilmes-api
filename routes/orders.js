@@ -20,6 +20,7 @@ module.exports = app => {
   -----------------------------------------
   POST    /orders                전체 주문 조회
   POST    /orders-by-ids         전체 주문 조회 (ID조회)
+  POST    /orders-for-xls        전체 주문 조회 (엑셀추출용)
   GET     /orders-by-product/:id 전체 주문 조회 (품목조회)
   GET     /orders/:id            단일 주문 조회
   POST    /orders/add            주문 추가
@@ -118,18 +119,13 @@ module.exports = app => {
         if (show_completed === false) this.where('is_completed', false);
       })
       .then(orders => {
-        if (orders.length) {
-          const ids = orders.map(order => order.id);
-          const data = {
-            count: orders.length,
-            ids,
-            orders: orders.slice(offset, offset + limit)
-          };
-          res.json(onRequestSuccess(data));
-        } else {
-          const data = { count: 0, ids: [], orders: [] };
-          res.json(onRequestSuccess(data));
-        }
+        const ids = orders.map(order => order.id);
+        const data = {
+          count: orders.length,
+          ids,
+          orders: orders.slice(offset, offset + limit)
+        };
+        res.json(onRequestSuccess(data));
       })
       .catch(error =>
         res.status(400).json(onRequestFail('error fetching orders'))
@@ -159,6 +155,48 @@ module.exports = app => {
   });
 
   /*-----------------------------
+    전체 주문 조회 (엑셀추출용)
+  -----------------------------*/
+  app.post('/orders-for-xls', requireLogin, canReadOrders, (req, res) => {
+    const {
+      date_from = moment()
+        .subtract(14, 'days')
+        .format('YYYY-MM-DD'),
+      date_to = moment().format('YYYY-MM-DD'),
+      account_name = '',
+      product_name = '',
+      product_thick = '',
+      product_length = '',
+      product_width = '',
+      show_completed = false
+    } = req.body;
+
+    db.with('joinedTable', joinedTable)
+      .select('*')
+      .from('joinedTable')
+      .whereBetween('ordered_at', [date_from, date_to])
+      .andWhere('account_name', 'like', `%${account_name}%`)
+      .andWhere('product_name', 'like', `%${product_name}%`)
+      .andWhere('product_thick', 'like', `%${product_thick}%`)
+      .andWhere('product_length', 'like', `%${product_length}%`)
+      .andWhere('product_width', 'like', `%${product_width}%`)
+      .andWhere(function() {
+        if (show_completed === false) this.where('is_completed', false);
+      })
+      .then(orders =>
+        res.json(
+          onRequestSuccess({
+            count: orders.length,
+            orders
+          })
+        )
+      )
+      .catch(error =>
+        res.status(400).json(onRequestFail('error fetching orders'))
+      );
+  });
+
+  /*-----------------------------
     전체 주문 조회 (품목별 조회)
   -----------------------------*/
   app.get('/orders-by-product/:id', requireLogin, canReadOrders, (req, res) => {
@@ -167,7 +205,7 @@ module.exports = app => {
     db.with('joinedTable', joinedTable)
       .select('*')
       .from('joinedTable')
-      .where('product_id', '=',id)
+      .where('product_id', '=', id)
       .then(orders => {
         if (orders.length) {
           res.json(onRequestSuccess(orders));

@@ -12,7 +12,7 @@ module.exports = app => {
   ROUTES
   -----------------------------------------
   POST    /accounts         전체 거래처 조회
-  POST    /accounts/for-xls 전체 거래처 조회 (엑셀추출용)
+  POST    /accounts-for-xls 전체 거래처 조회 (엑셀추출용)
   GET     /accounts/:id     단일 거래처 조회
   GET     /accounts         거래처명 조회
   POST    /accounts/add     거래처 추가
@@ -70,7 +70,7 @@ module.exports = app => {
         const data = {
           count: accounts.length,
           ids,
-          accounts
+          accounts: accounts.slice(offset, offset + limit)
         };
         res.json(onRequestSuccess(data));
       })
@@ -82,7 +82,7 @@ module.exports = app => {
   /*-----------------------------
     전체 거래처 조회 (엑셀추출용)
   -----------------------------*/
-  app.post('/accounts/for-xls', requireLogin, canReadAccounts, (req, res) => {
+  app.post('/accounts-for-xls', requireLogin, canReadAccounts, (req, res) => {
     const { account_name = '' } = req.body;
 
     db('accounts')
