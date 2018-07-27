@@ -11,12 +11,13 @@ module.exports = app => {
   /*=======================================
   ROUTES
   -----------------------------------------
-  POST    /accounts      전체 거래처 조회
-  GET     /accounts/:id  단일 거래처 조회
-  GET     /accounts      거래처명 조회
-  POST    /accounts/add  거래처 추가
-  PUT     /accounts/:id  거래처 정보 수정
-  DELETE  /accounts      거래처 삭제
+  POST    /accounts         전체 거래처 조회
+  POST    /accounts/for-xls 전체 거래처 조회 (엑셀추출용)
+  GET     /accounts/:id     단일 거래처 조회
+  GET     /accounts         거래처명 조회
+  POST    /accounts/add     거래처 추가
+  PUT     /accounts/:id     거래처 정보 수정
+  DELETE  /accounts         거래처 삭제
   =========================================*/
 
   // Create table if table does not exist
@@ -64,23 +65,38 @@ module.exports = app => {
       .orderBy('account_name', 'asc')
       .select('*')
       .where('account_name', 'like', `%${account_name}%`)
-      .limit(limit)
-      .offset(offset)
       .then(accounts => {
-        if (accounts.length) {
-          db.select('id')
-            .from('accounts')
-            .where('account_name', 'like', `%${account_name}%`)
-            .then(result => {
-              const ids = result.map(({ id }) => id);
-              const data = { count: result.length, ids, accounts };
-              res.json(onRequestSuccess(data));
-            });
-        } else {
-          const data = { count: 0, accounts: [] };
-          res.json(onRequestSuccess(data));
-        }
+        const ids = accounts.map(account => account.id);
+        const data = {
+          count: accounts.length,
+          ids,
+          accounts
+        };
+        res.json(onRequestSuccess(data));
       })
+      .catch(error =>
+        res.status(400).json(onRequestFail('error fetching accounts'))
+      );
+  });
+
+  /*-----------------------------
+    전체 거래처 조회 (엑셀추출용)
+  -----------------------------*/
+  app.post('/accounts/for-xls', requireLogin, canReadAccounts, (req, res) => {
+    const { account_name = '' } = req.body;
+
+    db('accounts')
+      .orderBy('account_name', 'asc')
+      .select('*')
+      .where('account_name', 'like', `%${account_name}%`)
+      .then(accounts =>
+        res.json(
+          onRequestSuccess({
+            count: accounts.length,
+            accounts
+          })
+        )
+      )
       .catch(error =>
         res.status(400).json(onRequestFail('error fetching accounts'))
       );
@@ -111,7 +127,6 @@ module.exports = app => {
     거래처명 조회
   -----------------------------*/
   app.get('/accounts', requireLogin, (req, res) => {
-
     db.select('id', 'account_name')
       .from('accounts')
       .orderBy('account_name', 'asc')

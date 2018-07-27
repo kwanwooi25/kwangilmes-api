@@ -16,6 +16,10 @@ const REQUIRED_PROPS = [
 ];
 const { SAMPLE_PRODUCTS } = require('../fixture');
 
+const joinedTable = db.raw(
+  'select products.*, accounts.account_name, accounts.phone, accounts.fax, accounts.email, accounts.email_tax, accounts.address, accounts.reg_no, accounts.ceo_name, accounts.ceo_phone, accounts.ceo_email, accounts.manager_name, accounts.manager_phone, accounts.manager_email, accounts.account_memo from products left join accounts on accounts.id = products.account_id order by accounts.account_name, products.product_name, products.product_thick, products.product_length, products.product_width'
+);
+
 module.exports = app => {
   /*=======================================
   ROUTES
@@ -98,9 +102,9 @@ module.exports = app => {
       print_color = ''
     } = req.body;
 
-    db.select('*')
-      .from('accounts')
-      .join('products', 'accounts.id', 'products.account_id')
+    db.with('joinedTable', joinedTable)
+      .select('*')
+      .from('joinedTable')
       .where('account_name', 'like', `%${account_name}%`)
       .andWhere('product_name', 'like', `%${product_name}%`)
       .andWhere('product_thick', 'like', `%${product_thick}%`)
@@ -114,7 +118,6 @@ module.exports = app => {
           `%${print_color}%`
         );
       })
-      .orderBy('product_name', 'asc')
       .then(products => {
         if (products.length) {
           const ids = products.map(product => product.id);
@@ -129,6 +132,49 @@ module.exports = app => {
           res.json(onRequestSuccess(data));
         }
       })
+      .catch(error =>
+        res.status(400).json(onRequestFail('error fetching products'))
+      );
+  });
+
+  /*-----------------------------
+    전체 품목 조회 (엑셀추출용)
+  -----------------------------*/
+  app.post('/products/for-xls', requireLogin, canReadProducts, (req, res) => {
+    const {
+      account_name = '',
+      product_name = '',
+      product_thick = '',
+      product_length = '',
+      product_width = '',
+      ext_color = '',
+      print_color = ''
+    } = req.body;
+
+    db.with('joinedTable', joinedTable)
+      .select('*')
+      .from('joinedTable')
+      .where('account_name', 'like', `%${account_name}%`)
+      .andWhere('product_name', 'like', `%${product_name}%`)
+      .andWhere('product_thick', 'like', `%${product_thick}%`)
+      .andWhere('product_length', 'like', `%${product_length}%`)
+      .andWhere('product_width', 'like', `%${product_width}%`)
+      .andWhere('ext_color', 'like', `%${ext_color}%`)
+      .andWhere(function() {
+        this.where('print_front_color', 'like', `%${print_color}%`).orWhere(
+          'print_back_color',
+          'like',
+          `%${print_color}%`
+        );
+      })
+      .then(products =>
+        res.json(
+          onRequestSuccess({
+            count: products.length,
+            products
+          })
+        )
+      )
       .catch(error =>
         res.status(400).json(onRequestFail('error fetching products'))
       );
