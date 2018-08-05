@@ -242,45 +242,65 @@ module.exports = app => {
     품목 추가 (single, multi)
   -----------------------------*/
   app.post('/products/add', requireLogin, canWriteProducts, (req, res) => {
-    const data = req.body; // array of product object
+    let data = req.body; // array of product object
 
-    // check required field
-    const isRequiredEmpty = data
-      .map(product => {
-        return REQUIRED_PROPS.map(prop => !!product[prop]).includes(false);
-      })
-      .includes(true);
-
-    if (isRequiredEmpty)
-      return res.status(400).json(onRequestFail('필수항목을 입력해야 합니다.'));
-
-    // check if account id of product exists
     Promise.all(
-      data.map(product =>
-        db('accounts')
-          .select('account_name')
-          .where('id', '=', product.account_id)
-          .then(response => !!response.length)
-      )
-    )
-      .then(results => results.includes(false))
-      .then(isAccountIdInvalid => {
-        if (isAccountIdInvalid) {
-          res.status(400).json(onRequestFail('존재하지 않는 업체입니다.'));
+      data.map(product => {
+        if (product.account_name) {
+          return db('accounts')
+            .select('id')
+            .where('account_name', '=', product.account_name)
+            .then(response => {
+              product.account_id = response[0].id;
+              delete product.account_name;
+              return product;
+            });
         } else {
-          // 최초 생성일자 입력
-          data.forEach(product => {
-            product.product_created_at = new Date();
-          });
-          db.insert(data)
-            .into('products')
-            .returning('*')
-            .then(products => res.json(onRequestSuccess(products)))
-            .catch(error =>
-              res.status(400).json(onRequestFail('error adding products'))
-            );
+          return product;
         }
-      });
+      })
+    ).then(dataToAdd => {
+      // check required field
+      const isRequiredEmpty = dataToAdd
+        .map(product => {
+          return REQUIRED_PROPS.map(prop => !!product[prop]).includes(false);
+        })
+        .includes(true);
+
+      if (isRequiredEmpty)
+        return res
+          .status(400)
+          .json(onRequestFail('필수항목을 입력해야 합니다.'));
+
+      // check if account id of product exists
+      Promise.all(
+        dataToAdd.map(product =>
+          db('accounts')
+            .select('account_name')
+            .where('id', '=', product.account_id)
+            .then(response => !!response.length)
+        )
+      )
+        .then(results => results.includes(false))
+        .then(isAccountIdInvalid => {
+          if (isAccountIdInvalid) {
+            res.status(400).json(onRequestFail('존재하지 않는 업체입니다.'));
+          } else {
+            // 최초 생성일자 입력
+            dataToAdd.forEach(product => {
+              product.product_created_at = new Date();
+            });
+
+            db.insert(dataToAdd)
+              .into('products')
+              .returning('*')
+              .then(products => res.json(onRequestSuccess(products)))
+              .catch(error =>
+                res.status(400).json(onRequestFail('error adding products'))
+              );
+          }
+        });
+    });
   });
 
   /*-----------------------------

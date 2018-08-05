@@ -10,7 +10,7 @@ const REQUIRED_PROPS = ['plate_round', 'plate_length', 'plate_material'];
 const { SAMPLE_PLATES } = require('../fixture');
 
 const joinedTable = db.raw(
-  `select plates.*, p1.product_name as product_1_name, p1.product_thick as product_1_thick, p1.product_length as product_1_length, p1.product_width as product_1_width, p2.product_name as product_2_name, p2.product_thick as product_2_thick, p2.product_length as product_2_length, p2.product_width as product_2_width, p3.product_name as product_3_name, p3.product_thick as product_3_thick, p3.product_length as product_3_length, p3.product_width as product_3_width from plates left join products as p1 on plates.product_1 = p1.id left join products as p2 on plates.product_2 = p2.id left join products as p3 on plates.product_3 = p3.id order by plates.plate_round, plates.plate_length`
+  `select plates.*, p1.account_id as product_1_account_id, p1.product_name as product_1_name, p1.product_thick as product_1_thick, p1.product_length as product_1_length, p1.product_width as product_1_width, p2.account_id as product_2_account_id, p2.product_name as product_2_name, p2.product_thick as product_2_thick, p2.product_length as product_2_length, p2.product_width as product_2_width, p3.account_id as product_3_account_id, p3.product_name as product_3_name, p3.product_thick as product_3_thick, p3.product_length as product_3_length, p3.product_width as product_3_width from plates left join products as p1 on plates.product_1 = p1.id left join products as p2 on plates.product_2 = p2.id left join products as p3 on plates.product_3 = p3.id order by plates.plate_round, plates.plate_length`
 );
 
 module.exports = app => {
@@ -114,14 +114,37 @@ module.exports = app => {
       .andWhere('plate_round', 'like', `%${plate_round}%`)
       .andWhere('plate_length', 'like', `%${plate_length}%`)
       .andWhere('plate_material', 'like', `%${plate_material}%`)
-      .then(plates =>
-        res.json(
-          onRequestSuccess({
-            count: plates.length,
-            plates
+      .then(data => {
+        Promise.all(
+          data.map(plate => {
+            const ids = [
+              plate.product_1_account_id,
+              plate.product_2_account_id,
+              plate.product_3_account_id
+            ];
+
+            return db('accounts')
+              .select('id', 'account_name')
+              .whereIn('id', ids)
+              .then(response => {
+                response.forEach(({ id, account_name }) => {
+                  const seq = ids.indexOf(id) + 1;
+                  plate[`product_${seq}_account_name`] = account_name;
+                  delete plate[`product_${seq}_account_id`];
+                });
+
+                return plate;
+              });
           })
-        )
-      )
+        ).then(plates => {
+          return res.json(
+            onRequestSuccess({
+              count: plates.length,
+              plates
+            })
+          );
+        });
+      })
       .catch(error =>
         res.status(400).json(onRequestFail('error fetching plates'))
       );
@@ -164,17 +187,83 @@ module.exports = app => {
     if (isRequiredEmpty) {
       res.status(400).json(onRequestFail('필수항목을 입력해야 합니다.'));
     } else {
-      // 최초 생성일자 입력
-      data.forEach(plate => {
-        plate.plate_created_at = new Date();
+      const modifiedData = data.map(plate => {
+
+        const plateInfo = {
+          plate_round: plate.plate_round,
+          plate_length: plate.plate_length,
+          plate_material: plate.plate_material,
+          storage_location: plate.storage_location,
+          product_1: plate.product_1,
+          product_2: plate.product_2,
+          product_3: plate.product_3,
+          memo: plate.memo,
+          plate_created_at: new Date()
+        };
+
+        let products = [];
+        for (let i = 1; i <= 3; i++) {
+          if (plate[`product_${i}_account_name`]) {
+            products.push({
+              account_name: plate[`product_${i}_account_name`],
+              product_name: plate[`product_${i}_name`],
+              product_thick: plate[`product_${i}_thick`],
+              product_length: plate[`product_${i}_length`],
+              product_width: plate[`product_${i}_width`]
+            });
+          }
+        }
+
+        return { plateInfo, products };
       });
-      db.insert(data)
-        .into('plates')
-        .returning('*')
-        .then(plates => res.json(onRequestSuccess(plates)))
-        .catch(error =>
-          res.status(400).json(onRequestFail('error adding plates'))
-        );
+
+      Promise.all(
+        modifiedData.map(({ plateInfo, products }) => {
+          return Promise.all(
+            products.map(product => {
+              return db('accounts')
+                .select('id')
+                .where('account_name', '=', product.account_name)
+                .then(result => {
+                  if (result.length) {
+                    product.account_id = result[0].id;
+                    return product;
+                  }
+                });
+            })
+          ).then(result => {
+            return Promise.all(
+              result.map(product => {
+                if (product !== undefined) {
+                  return db('products')
+                    .select('id')
+                    .where('account_id', '=', product.account_id)
+                    .andWhere('product_name', '=', product.product_name)
+                    .andWhere('product_thick', '=', product.product_thick)
+                    .andWhere('product_length', '=', product.product_length)
+                    .andWhere('product_width', '=', product.product_width)
+                    .then(result => {
+                      if (result.length) return result[0].id;
+                    });
+                }
+              })
+            ).then(productIds => {
+              productIds.forEach((productId, index) => {
+                plateInfo[`product_${index + 1}`] = productId;
+              });
+              return plateInfo;
+            });
+          });
+        })
+      ).then(dataToAdd => {
+        db.insert(dataToAdd)
+          .into('plates')
+          .returning('*')
+          .then(plates => res.json(onRequestSuccess(plates)))
+          .catch(error =>
+            res.status(400).json(onRequestFail('error adding plates'))
+          );
+      });
     }
   });
 
