@@ -78,14 +78,37 @@ module.exports = app => {
       .andWhere('plate_round', 'like', `%${plate_round}%`)
       .andWhere('plate_length', 'like', `%${plate_length}%`)
       .andWhere('plate_material', 'like', `%${plate_material}%`)
-      .then(plates => {
-        const ids = plates.map(plate => plate.id);
-        const data = {
-          count: plates.length,
-          ids,
-          plates: plates.slice(offset, offset + limit)
-        };
-        return res.json(onRequestSuccess(data));
+      .then(data => {
+        Promise.all(
+          data.map(plate => {
+            const ids = [
+              plate.product_1_account_id,
+              plate.product_2_account_id,
+              plate.product_3_account_id
+            ];
+
+            return db('accounts')
+              .select('id', 'account_name')
+              .whereIn('id', ids)
+              .then(response => {
+                response.forEach(({ id, account_name }) => {
+                  const seq = ids.indexOf(id) + 1;
+                  plate[`product_${seq}_account_name`] = account_name;
+                  delete plate[`product_${seq}_account_id`];
+                });
+
+                return plate;
+              });
+          })
+        ).then(plates => {
+          const ids = plates.map(plate => plate.id);
+          const data = {
+            count: plates.length,
+            ids,
+            plates: plates.slice(offset, offset + limit)
+          };
+          return res.json(onRequestSuccess(data));
+        });
       })
       .catch(error =>
         res.status(400).json(onRequestFail('error fetching plates'))
@@ -188,7 +211,6 @@ module.exports = app => {
       res.status(400).json(onRequestFail('필수항목을 입력해야 합니다.'));
     } else {
       const modifiedData = data.map(plate => {
-
         const plateInfo = {
           plate_round: plate.plate_round,
           plate_length: plate.plate_length,
