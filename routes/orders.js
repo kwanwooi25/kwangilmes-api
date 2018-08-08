@@ -18,15 +18,16 @@ module.exports = app => {
   /*=======================================
   ROUTES
   -----------------------------------------
-  POST    /orders                전체 주문 조회
-  POST    /orders-by-ids         전체 주문 조회 (ID조회)
-  POST    /orders-for-xls        전체 주문 조회 (엑셀추출용)
-  GET     /orders-by-product/:id 전체 주문 조회 (품목조회)
-  GET     /orders/:id            단일 주문 조회
-  POST    /orders/add            주문 추가
-  PUT     /orders/:id            주문 정보 수정
-  PUT     /orders-complete       작업 완료 처리
-  DELETE  /orders                주문 삭제
+  POST    /orders                   전체 주문 조회
+  POST    /orders-by-ids            전체 주문 조회 (ID조회)
+  POST    /orders-for-xls           전체 주문 조회 (엑셀추출용)
+  POST    /orders-delivery-schedule 전체 주문 조회 (납품일정용)
+  GET     /orders-by-product/:id    전체 주문 조회 (품목조회)
+  GET     /orders/:id               단일 주문 조회
+  POST    /orders/add               주문 추가
+  PUT     /orders/:id               주문 정보 수정
+  PUT     /orders-complete          작업 완료 처리
+  DELETE  /orders                   주문 삭제
   =========================================*/
 
   // Create table if table does not exist
@@ -191,6 +192,25 @@ module.exports = app => {
           })
         )
       )
+      .catch(error =>
+        res.status(400).json(onRequestFail('error fetching orders'))
+      );
+  });
+
+  /*-----------------------------
+    전체 주문 조회 (납품일정용)
+  -----------------------------*/
+  app.post('/orders-delivery-schedule', requireLogin, canReadOrders, (req, res) => {
+    const { year, month } = req.body;
+    const date_from = moment([year, month]).startOf('month').format('YYYY-MM-DD');
+    const date_to = moment([year, month]).endOf('month').format('YYYY-MM-DD');
+
+    db.with('joinedTable', joinedTable)
+      .select('*')
+      .from('joinedTable')
+      .whereBetween('deliver_by', [date_from, date_to])
+      // .andWhere('is_completed', '=', false)
+      .then(orders => res.json(onRequestSuccess({ orders })))
       .catch(error =>
         res.status(400).json(onRequestFail('error fetching orders'))
       );
