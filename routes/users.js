@@ -62,7 +62,7 @@ module.exports = (app) => {
   GET     /users                     전체 사용자 정보
   GET     /users/:username           선택 사용자 정보
   PUT     /users/:username           사용자 정보 수정
-  PUT     /users/password/:username  사용자 비밀번호 수정
+  PUT     /users_password/:username  사용자 비밀번호 수정
   DELETE  /users/:username           사용자 삭제
   POST    /register                  사용자 등록
   ================================================*/
@@ -227,7 +227,7 @@ module.exports = (app) => {
 	/*-----------------------------
     사용자 정보 수정
   -----------------------------*/
-	app.put('/users/:username', requireLogin, canReadUsers, (req, res) => {
+	app.put('/users/:username', requireLogin, canWriteUsers, (req, res) => {
 		const { username } = req.params;
 		const data = req.body;
 		if (data.display_name === '') delete data.display_name;
@@ -243,7 +243,7 @@ module.exports = (app) => {
 	/*-----------------------------
     사용자 비밀번호 수정
   -----------------------------*/
-	app.put('/users/password/:username', requireLogin, canReadUsers, (req, res) => {
+	app.put('/users_password/:username', requireLogin, canWriteUsers, (req, res) => {
 		const { username } = req.params;
 		const data = req.body;
 		const loginData = {};
@@ -264,7 +264,7 @@ module.exports = (app) => {
 	/*-----------------------------
     사용자 삭제
   -----------------------------*/
-	app.delete('/users/:username', requireLogin, canReadUsers, (req, res) => {
+	app.delete('/users/:username', requireLogin, canWriteUsers, (req, res) => {
 		const { username } = req.params;
 		if (username === 'admin') return res.status(400).json('admin 계정은 삭제할 수 없습니다.');
 
