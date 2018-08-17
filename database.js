@@ -6,6 +6,7 @@ module.exports = knex({
     host: 'kwanwoodb.ccbl9zbqcka3.ap-northeast-2.rds.amazonaws.com',
     user: 'kwanwooi',
     password: 'rhksnsla12',
-    database: 'kwangilmes_test2'
+    database: 'kwangilmes'
+    // database: 'kwangilmes-test2'
   }
 });
