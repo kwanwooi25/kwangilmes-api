@@ -79,11 +79,11 @@ module.exports = app => {
         })
         .then(result => {
           console.log("TABLE CREATED: 'products'");
-          db.insert(SAMPLE_PRODUCTS)
-            .into('products')
-            .then(result => {
-              console.log('SAMPLE_PRODUCTS added');
-            });
+          // db.insert(SAMPLE_PRODUCTS)
+          //   .into('products')
+          //   .then(result => {
+          //     console.log('SAMPLE_PRODUCTS added');
+          //   });
         });
     }
   });

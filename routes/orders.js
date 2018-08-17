@@ -45,11 +45,11 @@ module.exports = app => {
         })
         .then(() => {
           console.log("TABLE CREATED: 'orders_id_seq'");
-          db.insert({ id: '2018-05', seq: 125 })
-            .into('orders_id_seq')
-            .then(result => {
-              console.log('orders_id_seq updated');
-            });
+          // db.insert({ id: '2018-05', seq: 125 })
+          //   .into('orders_id_seq')
+          //   .then(result => {
+          //     console.log('orders_id_seq updated');
+          //   });
 
           db.schema
             .createTable('orders', table => {
@@ -80,11 +80,11 @@ module.exports = app => {
             })
             .then(result => {
               console.log("TABLE CREATED: 'orders'");
-              db.insert(SAMPLE_ORDERS)
-                .into('orders')
-                .then(result => {
-                  console.log('SAMPLE_ORDERS added');
-                });
+              // db.insert(SAMPLE_ORDERS)
+              //   .into('orders')
+              //   .then(result => {
+              //     console.log('SAMPLE_ORDERS added');
+              //   });
             });
         });
     }
