@@ -151,7 +151,9 @@ module.exports = app => {
                       .map(oldHistory => {
                         return {
                           date: oldHistory[0].trim(),
-                          quantity: Number(oldHistory[1].trim())
+                          quantity: Number(
+                            oldHistory[1].trim().replace(/,/g, '')
+                          )
                         };
                       });
                   }
