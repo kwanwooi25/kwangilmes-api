@@ -136,6 +136,8 @@ module.exports = app => {
                 .select('*')
                 .where('product_id', '=', product.id)
                 .then(orders => {
+                  product.history = [];
+
                   // convert older history
                   const { old_history } = product;
                   if (old_history) {
@@ -167,6 +169,7 @@ module.exports = app => {
             })
           ).then(productsWithHistory => {
             data.products = productsWithHistory;
+            console.log(data);
             res.json(onRequestSuccess(data));
           });
         } else {
