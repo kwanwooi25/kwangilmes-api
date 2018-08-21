@@ -29,6 +29,7 @@ module.exports = (app) => {
   DELETE  /orders                   주문 삭제
   =========================================*/
 
+<<<<<<< HEAD
 	// Create table if table does not exist
 	db.schema.hasTable('orders').then((ordersTableExists) => {
 		// if (ordersTableExists) db.schema.dropTable('orders').then(() => {
@@ -81,6 +82,67 @@ module.exports = (app) => {
 	});
 
 	/*-----------------------------
+=======
+  // Create table if table does not exist
+  db.schema.hasTable('orders').then(ordersTableExists => {
+    // if (ordersTableExists) db.schema.dropTable('orders').then(() => {
+    //   db.schema.dropTable('orders_id_seq').then(console.log)
+    // });
+    if (!ordersTableExists) {
+      db.schema
+        .createTable('orders_id_seq', table => {
+          table.string('id').primary();
+          table.integer('seq').defaultTo(1);
+        })
+        .then(() => {
+          console.log("TABLE CREATED: 'orders_id_seq'");
+          // db.insert({ id: '2018-05', seq: 125 })
+          //   .into('orders_id_seq')
+          //   .then(result => {
+          //     console.log('orders_id_seq updated');
+          //   });
+
+          db.schema
+            .createTable('orders', table => {
+              table
+                .string('id')
+                .primary()
+                .unique();
+              table.timestamp('ordered_at').notNullable();
+              table.timestamp('order_modified_at');
+              table.boolean('is_order_modified').defaultTo(false);
+              table.integer('account_id').notNullable();
+              table.integer('product_id').notNullable();
+              table.integer('order_quantity').notNullable();
+              table.float('order_quantity_weight').notNullable();
+              table.string('plate_status'); // 신규, 수정, 확인
+              table.boolean('is_plate_ready').defaultTo(true);
+              table.string('order_status').defaultTo('압출중'); // 압출중, 인쇄중, 가공중, 완료
+              table.timestamp('deliver_by').notNullable();
+              table.boolean('is_delivery_strict').defaultTo(false);
+              table.boolean('is_urgent').defaultTo(false);
+              table.text('order_memo_work');
+              table.text('order_memo_delivery');
+              table.boolean('is_completed').defaultTo(false);
+              table.timestamp('completed_at');
+              table.integer('completed_quantity');
+              table.boolean('is_delivered').defaultTo(false);
+              table.timestamp('delivered_at');
+            })
+            .then(result => {
+              console.log("TABLE CREATED: 'orders'");
+              // db.insert(SAMPLE_ORDERS)
+              //   .into('orders')
+              //   .then(result => {
+              //     console.log('SAMPLE_ORDERS added');
+              //   });
+            });
+        });
+    }
+  });
+
+  /*-----------------------------
+>>>>>>> a61930302cfc112c48eb0f2e20daf3d0bae5057d
     전체 주문 조회
   -----------------------------*/
 	app.post('/orders', requireLogin, canReadOrders, (req, res) => {

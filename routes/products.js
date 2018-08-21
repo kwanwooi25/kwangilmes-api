@@ -79,11 +79,11 @@ module.exports = app => {
         })
         .then(result => {
           console.log("TABLE CREATED: 'products'");
-          db.insert(SAMPLE_PRODUCTS)
-            .into('products')
-            .then(result => {
-              console.log('SAMPLE_PRODUCTS added');
-            });
+          // db.insert(SAMPLE_PRODUCTS)
+          //   .into('products')
+          //   .then(result => {
+          //     console.log('SAMPLE_PRODUCTS added');
+          //   });
         });
     }
   });
@@ -151,7 +151,9 @@ module.exports = app => {
                       .map(oldHistory => {
                         return {
                           date: oldHistory[0].trim(),
-                          quantity: Number(oldHistory[1].trim())
+                          quantity: Number(
+                            oldHistory[1].trim().replace(/,/g, '')
+                          )
                         };
                       });
                   }
