@@ -3,7 +3,7 @@ const { onRequestSuccess, onRequestFail } = require('../utils');
 const { JWT_SECRET } = require('../config/keys');
 
 module.exports = (req, res, next) => {
-  const token = req.headers['x-access-token'];
+  const token = req.headers['x-access-token'] || req.query.token;
   if (!token) return res.json(onRequestFail('token is required!'));
   else {
     jwt.verify(token, JWT_SECRET, (error, decoded) => {
